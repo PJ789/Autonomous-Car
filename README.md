@@ -1,5 +1,5 @@
 # Autonomous-Car
-An autonomous vehicle based on a Raspberry Pi Pico, using servo motors, DC motors, PWM speed control, ultrasound sensors, multicore code.
+An autonomous vehicle based on a Raspberry Pi Pico, using servo motors, DC motors, PWM speed control, ultrasound sensors, multi-core code.
 
 ## Overview
 
@@ -7,7 +7,7 @@ This project repurposes an old RC car to become an autonomous vehicle.
 
 The car uses a Raspberry Pi Pico for its brains... running code on both cores, using the _official_ [Arduino Core based on Mbed RTOS which includes support for Pico.](https://github.com/arduino/ArduinoCore-mbed/tree/master/variants/RASPBERRY_PI_PICO).
 
-- Core0 provides DC steering motor & drive motor control , and route planning.
+- Core0 provides DC steering motor & drive motor control, and route planning.
 
 - Core1 operates an ultrasound 'radar' turret mounted on the roof
  
@@ -39,11 +39,11 @@ A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where
 
 ## Some Apologies
 
-Sorry there are no circuit diagrams. Sorry about the code quality. And sorry about any bugs.
+Sorry there are no circuit diagrams. Sorry about the code quality. Route planning is elementary at present, tba. And sorry about any bugs.
 
 ## Some Caveats
 
-The code is a work in progress, and offered for interest only. Some elements don't work fully, some don't work at all. E&OE.
+The code is a work in progress, and offered for interest/reference only. Some elements don't work fully, some don't work at all. E&OE.
 
 If you find it useful, please enjoy it. If you have suggestions for improvement, I'd be very interested.
 
