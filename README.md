@@ -5,7 +5,7 @@ An autonomous vehicle based on a Raspberry Pi Pico, using servo motors, DC motor
 
 This project repurposes an old RC car to become an autonomous vehicle.
 
-The car uses a Raspberry Pi Pico for its brains... running code on both cores, using the _official_ Arduino Pico Core.
+The car uses a Raspberry Pi Pico for its brains... running code on both cores, using the _official_ [Arduino Core based on Mbed RTOS which includes support for Pico.](https://github.com/arduino/ArduinoCore-mbed/tree/master/variants/RASPBERRY_PI_PICO).
 
 - Core0 provides DC steering motor & drive motor control , and route planning.
 
@@ -30,7 +30,7 @@ A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where
 - This code compiles under the Arduino IDE, but uses the Pico SDK. This creates some awkward problems; particularly the Pico SDK 'printf' function doesn't work. I'm still trying to find a workaround.
 - Pico PWM settings affect multiple pins in a group. If you use PWM, it seems you should avoid using other pins in the same group, else you can experience strange side-effects. [See also these useful notes; 'making sure not to use two GPIO pins having the same number and letter designation together'](https://www.etechnophiles.com/raspberry-pi-pico-pinout-specifications-datasheet-in-detail/)
 - Core1 seems very sensitive to low power conditions; you need a robust 5V power supply, or else core1 will stop functioning.
-- To avoid concurrency problems when writing multi-core code, avoid using any Arduino or mbed APIs (they are not designed for multi-core MCUs, and may crash the Pico... leading to flashing error codes and requiring a reset). 
+- To avoid concurrency problems when writing multi-core code, avoid using any Arduino or mbed APIs (they are supposedly not designed for multi-core MCUs, and may crash the Pico... leading to flashing error codes and requiring a reset). 
 - To avoid concurrency problems, I also avoided creating heap objects on Core1 (so relying on the Core1 stack exclusively, which is not shared with Core0)
 - The default stack size on both cores seems quite small, especially if you are using C++ object oriented code libraries and using the stack to avoid creating heap objects (see above). I increased my stack sizes by setting compiler flags (-DPICO_STACK_SIZE=0x1000 -DPICO_CORE1_STACK_SIZE=0x1000)
 - To calculate the PWM frequency for a servo, you take the system clock (default 125mhz), divide it by the maximum PWM counter value (default 65535) to arrive at the current PWM frequency. Then pick a clock divider to align with your servo PWM frequency needs. Take a look at the servo code for an example of how this works.
