@@ -13,12 +13,15 @@ The car uses a Raspberry Pi Pico for its brains... running code on both cores.
 
 The code provides examples of;
  - A complex Pico project, compiled under the Arduino IDE
- - Multi-core programming using the Pico SDK
- - Servo control using PWM
- - DC motor control using PWM
+ - Multi-core programming using the [Pico C/C++SDK](https://datasheets.raspberrypi.com/pico/raspberry-pi-pico-c-sdk.pdf)
+ - Servo position control using PWM
+ - DC motor direction control using GPIO to switch a DPST mechanical relay using a MOSFET
+ - DC motor speed control using PWM via a MOSFET
  - Ultrasound sensor use
 
 The car has two custom circuits, each with a MOSFET switching a mechanical DPST relay. The relays control forward/backward and left/right DC motor direction (by reversing the polarity of the DC motors). Each circuit has a second MOSFETs, used to provide power on/off/PWM speed control.
+
+A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where necessary, to boost the Pico GPIO pins upto 5V.
 
 ## Some Notes
 
@@ -30,6 +33,11 @@ The car has two custom circuits, each with a MOSFET switching a mechanical DPST 
 - The default stack size on both cores seems quite small, especially if you are using C++ object oriented code libraries and using the stack to avoid creating heap objects (see above). I increased my stack sizes by setting compiler flags (-DPICO_STACK_SIZE=0x1000 -DPICO_CORE1_STACK_SIZE=0x1000)
 - To calculate the PWM frequency for a servo, you take the system clock (default 125mhz), divide it by the maximum PWM counter value (default 65535) to arrive at the current PWM frequency. Then pick a clock divider to align with your servo PWM frequency needs. Take a look at the servo code for an example of how this works.
 - If you're going to try your hand at multi-core programming... wire a push button switch to the Pico reset pin. You're going to need it. A lot.
+-  I didn't use the TXS0108E Logic Level Converter for the PWM signals to the turret servo... it doesn't seem to be fast enough. Wiring the servo power to the 5V/ground lines, but hooking the Pico GPIO PWM pin direct to the servo's PWM input worked fine. Mostly.
+
+## Some Apologies
+
+Sorry there are no circuit diagrams. Sorry about the code quality. And sorry about any bugs.
 
 ## Some Caveats
 
