@@ -5,7 +5,7 @@ An autonomous vehicle based on a Raspberry Pi Pico, using servo motors, DC motor
 
 This project repurposes an old RC car to become an autonomous vehicle.
 
-The car uses a Raspberry Pi Pico for its brains... running code on both cores.
+The car uses a Raspberry Pi Pico for its brains... running code on both cores, using the _official_ Arduino Pico Core.
 
 - Core0 provides DC steering motor & drive motor control , and route planning.
 
