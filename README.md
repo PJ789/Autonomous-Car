@@ -7,26 +7,28 @@ This project repurposes an old RC car to become an autonomous vehicle.
 
 The car uses a Raspberry Pi Pico for its brains... running code on both cores.
 
-- Core0 provides steering, DC motor control (using MOSFETs to switch mechanical relays), and route planning.
+- Core0 provides DC steering motor & drive motor control , and route planning.
 
-- Core1 operates an ultrasound 'radar' turret mounted on the roof [based on this 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back HC-SR04 ultrasound sensors. The ultrasound turret sits ontop of a [DOMAN S0090MD metal gear 9g digital servo](http://www.domanrchobby.com/content/?130.html).
-
+- Core1 operates an ultrasound 'radar' turret mounted on the roof
+ 
 The code provides examples of;
  - A complex Pico project, compiled under the Arduino IDE
  - Multi-core programming using the [Pico C/C++SDK](https://datasheets.raspberrypi.com/pico/raspberry-pi-pico-c-sdk.pdf)
- - Servo position control using PWM
+ - SG90 miniature servo position control using PWM
  - DC motor direction control using GPIO to switch a DPST mechanical relay using a MOSFET
  - DC motor speed control using PWM via a MOSFET
  - Ultrasound sensor use
 
-The car has two custom circuits, each with a MOSFET switching a mechanical DPST relay. The relays control forward/backward and left/right DC motor direction (by reversing the polarity of the DC motors). Each circuit has a second MOSFETs, used to provide power on/off/PWM speed control.
+The 'radar' turret is [based on this 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back HC-SR04 ultrasound sensors. The ultrasound turret sits ontop of a [DOMAN S0090MD metal gear 9g digital servo](http://www.domanrchobby.com/content/?130.html).
 
-A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where necessary, to boost the Pico GPIO pins upto 5V.
+The car has two custom circuits, each with an IRLZ44N MOSFET switching a mechanical DPST relay. The relays control forward/backward and left/right DC motor direction (by reversing the polarity of the power to the DC motors). Each circuit has a second MOSFETs, used to provide power on/off and PWM speed control.
+
+A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where necessary, to boost the 3.3V Pico GPIO pins up to 5V.
 
 ## Some Notes
 
 - This code compiles under the Arduino IDE, but uses the Pico SDK. This creates some awkward problems; particularly the Pico SDK 'printf' function doesn't work. I'm still trying to find a workaround.
-- Pico PWM settings affect multiple pins in a group. If you use PWM, it seems you should avoid using other pins in the same group, else you can experience strange side-effects.
+- Pico PWM settings affect multiple pins in a group. If you use PWM, it seems you should avoid using other pins in the same group, else you can experience strange side-effects. [See also these useful notes; 'making sure not to use two GPIO pins having the same number and letter designation together'](https://www.etechnophiles.com/raspberry-pi-pico-pinout-specifications-datasheet-in-detail/)
 - Core1 seems very sensitive to low power conditions; you need a robust 5V power supply, or else core1 will stop functioning.
 - To avoid concurrency problems when writing multi-core code, avoid using any Arduino or mbed APIs (they are not designed for multi-core MCUs, and may crash the Pico... leading to flashing error codes and requiring a reset). 
 - To avoid concurrency problems, I also avoided creating heap objects on Core1 (so relying on the Core1 stack exclusively, which is not shared with Core0)
