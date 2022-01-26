@@ -1,5 +1,5 @@
 # Autonomous-Car
-An autonomous vehicle based on a Raspberry Pi Pico, using servo motors, DC motors, PWM speed control, ultrasound sensors, multi-core code.
+An autonomous vehicle based on a Raspberry Pi Pico, using servo motors, DC motors, PWM speed control, ultrasound sensors, interrupts, and multi-core code.
 
 ## Overview
 
