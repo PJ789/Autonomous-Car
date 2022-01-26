@@ -6,7 +6,11 @@ Car car;
 
 void setup() {
   //stdio_init_all();
-
+Serial.begin(250000);
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB
+  }
+Serial.println("hello world");
   printf("Starting car on core 0\n");
 
   printf("Starting radar on core 1\n");
@@ -30,7 +34,10 @@ void setup() {
 // Core0 loop - navigation tasks
 void loop()
 {
+  Serial.println("carloop");
+
   car.Iterator();
+  car.DumpRadarMetrics();
 }
 
 

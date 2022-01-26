@@ -4,12 +4,23 @@ Radar::Radar()
 {
   _gpio_init(FRONT_ULTRASOUND_TRIG_PIN);
   gpio_set_dir(FRONT_ULTRASOUND_TRIG_PIN, GPIO_OUT);
+  
   _gpio_init(FRONT_ULTRASOUND_ECHO_PIN);
   gpio_set_dir(FRONT_ULTRASOUND_ECHO_PIN, GPIO_IN);
+  gpio_pull_down(FRONT_ULTRASOUND_ECHO_PIN);
+  gpio_set_input_enabled(FRONT_ULTRASOUND_ECHO_PIN, true);
+  gpio_set_irq_enabled_with_callback(FRONT_ULTRASOUND_ECHO_PIN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &UltrasoundIRQCallback);
+
   _gpio_init(REAR_ULTRASOUND_TRIG_PIN);
   gpio_set_dir(REAR_ULTRASOUND_TRIG_PIN, GPIO_OUT);
-  _gpio_init(FRONT_ULTRASOUND_ECHO_PIN);
-  gpio_set_dir(FRONT_ULTRASOUND_ECHO_PIN, GPIO_IN);
+  
+  _gpio_init(REAR_ULTRASOUND_ECHO_PIN);
+  gpio_set_dir(REAR_ULTRASOUND_ECHO_PIN, GPIO_IN);
+  gpio_pull_down(REAR_ULTRASOUND_ECHO_PIN);
+  gpio_set_input_enabled(REAR_ULTRASOUND_ECHO_PIN, true);
+  gpio_set_irq_enabled_with_callback(REAR_ULTRASOUND_ECHO_PIN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &UltrasoundIRQCallback);
+
+
   _gpio_init( RADAR_ACTIVE_PIN);
   gpio_set_dir( RADAR_ACTIVE_PIN,    GPIO_OUT);
   gpio_put(RADAR_ACTIVE_PIN, false);
@@ -24,7 +35,8 @@ Radar::Radar()
   Drive(forward);
   Steer(none);
   
-  multicore_fifo_push_timeout_us( RADAR_READY_FIFO_MESSAGE, 200 );
+  if (multicore_fifo_wready())
+    multicore_fifo_push_blocking( RADAR_READY_FIFO_MESSAGE );
 }
 void Radar::Iterator()
 {
@@ -36,10 +48,10 @@ void Radar::Iterator()
     DecodeFifo( fifo_message );
   }
 
-  //TurretRotationSequencer();
-  ServoDiagnostics();
-  
-  multicore_fifo_push_timeout_us( RADAR_READY_FIFO_MESSAGE, 200 );
+  TurretRotationSequencer();
+    
+  if (multicore_fifo_wready())
+    multicore_fifo_push_blocking( RADAR_READY_FIFO_MESSAGE );
 }
 void Radar::SetRadarActivePin()
 {
@@ -49,10 +61,10 @@ void Radar::TurretRotationSequencer()
 {
   uint8_t radar_sequence;
   int16_t target_radar_turret_angle;
-  uint32_t time_millis= 0;
+  uint64_t time_millis;
 
    // use pico api to avoid core crashing on millis
-  time_millis=time_us_32()/1000;
+  time_millis=time_us_64()/1000;
 
   if ( Turning() )
   {
@@ -125,8 +137,9 @@ void Radar::TurretRotationSequencer()
         target_radar_turret_angle = (  1 * RADAR_SCAN_STEP_DEGREES );
         break;
     }
-  }      
-  if (target_radar_turret_angle != TurretDirection() )
+  }
+
+  if (target_radar_turret_angle != GetTurretDirection() )
   {
     RotateTurret(target_radar_turret_angle);
     MeasureFront();
@@ -134,9 +147,9 @@ void Radar::TurretRotationSequencer()
   }
   
 }
-uint8_t Radar::TurretDirection()
+int8_t Radar::GetTurretDirection()
 {
-  return (ConvertServoAngleToCarAngle(radar_turret_angle));
+  return (ConvertServoAngleToCarAngle(radar_turret.GetDegrees()));
 }
 void Radar::RotateTurret(int16_t car_target_angle)
 {
@@ -149,13 +162,12 @@ void Radar::RotateTurret(int16_t car_target_angle)
 
   radar_turret_target_angle = ConvertCarAngleToServoAngle(car_target_angle);
   
-  radar_turret_angle_delta = (radar_turret_angle>radar_turret_target_angle)?(radar_turret_angle-radar_turret_target_angle):(radar_turret_target_angle-radar_turret_angle);
+  radar_turret_angle_delta = (radar_turret.GetDegrees()>radar_turret_target_angle)?(radar_turret.GetDegrees()-radar_turret_target_angle):(radar_turret_target_angle-radar_turret.GetDegrees());
   radar_turret_turn_time = radar_turret_angle_delta * RADAR_SERVO_MILLIS_PER_DEGREE;
  
   radar_turret.SetDegrees(radar_turret_target_angle);
-  TIMEWAIT_MILLIS(radar_turret_turn_time );
+  sleep_ms(radar_turret_turn_time );
 
-  radar_turret_angle = radar_turret_target_angle;
 }
 uint32_t Radar::MeasureFront()
 {
@@ -165,8 +177,13 @@ uint32_t Radar::MeasureFront()
   range = Measure( FRONT_ULTRASOUND_TRIG_PIN,FRONT_ULTRASOUND_ECHO_PIN );
   range = (range > 255)?255:range;
 
-  measurement_message = 'R'<<24 | 'F'<<16 | radar_turret_angle<<8 | range;
-  multicore_fifo_push_timeout_us(measurement_message,1000);
+  measurement_message = RADAR_FORWARD_RANGE_FIFO_MESSAGE;
+  measurement_message &= 0xFFFF0000;
+  measurement_message |= ((uint32_t)radar_turret.GetDegrees())<<8;
+  measurement_message |= range;
+  
+  if (multicore_fifo_wready())
+    multicore_fifo_push_blocking(measurement_message);
 
   return range;
 }
@@ -178,15 +195,20 @@ uint32_t Radar::MeasureRear()
   range = Measure( REAR_ULTRASOUND_TRIG_PIN,REAR_ULTRASOUND_ECHO_PIN );
   range = (range > 255)?255:range;
 
-  measurement_message = 'R'<<24 | 'R'<<16 | radar_turret_angle<<8 | range;
-  multicore_fifo_push_timeout_us(measurement_message,1000);
+  measurement_message = RADAR_REAR_RANGE_FIFO_MESSAGE;
+  measurement_message &= 0xFFFF0000;
+  measurement_message |= ((uint32_t)radar_turret.GetDegrees())<<8;
+  measurement_message |= range;
+  
+  if (multicore_fifo_wready())
+    multicore_fifo_push_blocking(measurement_message);
 
   return range;
 }
 float Radar::Measure( uint8_t trigger, uint8_t echo )
 {
   float distance;
-  uint32_t echo_duration;
+  float echo_duration;
 
   // 10us pulse on trigger pin
   gpio_put(trigger, false);
@@ -195,11 +217,11 @@ float Radar::Measure( uint8_t trigger, uint8_t echo )
   TIMEWAIT_MICROS(10);
   gpio_put(trigger, false);
 
-  // Read echo time
-  echo_duration = PulseIn(echo, HIGH, RADAR_ECHO_TIMEOUT_MICROS);
-  
-  echo_duration = (echo_duration == 0)?RADAR_ECHO_TIMEOUT_MICROS:echo_duration; // if timed out assume max distance
+  sleep_us( RADAR_ECHO_TIMEOUT_MICROS ); 
 
+  // Read echo time
+  echo_duration = Radar::ultrasound_pulse_duration;;
+  
   // Speed of ultrasound 350m/s (0.035cm/us)
   distance = echo_duration * 0.035 / 2.0; 
 
@@ -292,36 +314,6 @@ bool Radar::DirectionIsReverse()
 {
   return (last_drive_motor_direction == reverse);
 }
-uint32_t Radar::PulseIn( uint32_t pin, uint32_t state, uint32_t timeout )
-{
-  uint32_t start_us;
-  uint32_t pulse_start_us;
-  uint32_t width = 0;
-
-  // wait for pulse start
-  start_us = time_us_32();
-  while(
-      (gpio_get(pin)!=state)
-      &&
-      ((time_us_32() - start_us)<timeout)
-    );
-
-  if((time_us_32() - start_us)<timeout)
-  {
-    // wait for pulse end
-    pulse_start_us = time_us_32();
-    while(
-        (gpio_get(pin)==state)
-        &&
-        ((time_us_32() - start_us)<timeout)
-      );
-    width = (time_us_32() - pulse_start_us);
-  
-    TIMEWAIT_MICROS( timeout - width ); 
-  }
-
-  return width;
-}
 void Radar::DecodeFifo(uint32_t fifo_message)
 {
   char decoded_message[5];
@@ -379,6 +371,24 @@ void Radar::DecodeFifo(uint32_t fifo_message)
     default:
       printf("Unrecognised motor message type [%c][%s]\n", decoded_message[0], decoded_message);
       break;
+  }
+}
+uint32_t                  Radar::ultrasound_pulse_start;
+uint32_t                  Radar::ultrasound_pulse_duration;
+void Radar::UltrasoundIRQCallback(uint gpio, uint32_t events) {
+
+  if (events & GPIO_IRQ_EDGE_RISE )
+  {
+    gpio_put(RADAR_ACTIVE_PIN, true);
+    Radar::ultrasound_pulse_start    = time_us_32();
+    Radar::ultrasound_pulse_duration = 0;
+  }
+  if (events & GPIO_IRQ_EDGE_FALL)
+  {
+    gpio_put(RADAR_ACTIVE_PIN, false);
+    Radar::ultrasound_pulse_duration = time_us_32()-Radar::ultrasound_pulse_start;
+    Radar::ultrasound_pulse_duration = (Radar::ultrasound_pulse_duration<(RADAR_ECHO_TIMEOUT_MICROS/2))?Radar::ultrasound_pulse_duration:0;
+    Radar::ultrasound_pulse_start    = 0;
   }
 }
 

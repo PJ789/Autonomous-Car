@@ -19,12 +19,12 @@
 
 #define RADAR_ACTIVE_PIN                8
 
-#define RADAR_SERVO_MILLIS_PER_DEGREE  10
+#define RADAR_SERVO_MILLIS_PER_DEGREE   5
 #define RADAR_SCAN_STEP_DEGREES        25
 #define RADAR_SCAN_STEPS                8
 
 // 30000us = 525cm (0.035cm/us)
-#define RADAR_ECHO_TIMEOUT_MICROS       30000
+#define RADAR_ECHO_TIMEOUT_MICROS       60000
 #define RADAR_ECHO_TIMEOUT_MILLIS       (RADAR_ECHO_TIMEOUT_MICROS/1000)
 
 #define RADAR_MEASUREMENTS_GRANULARITY  5
@@ -39,8 +39,12 @@ class Radar
 
     void Iterator();
     void     SetRadarActivePin();
-    
-    
+    uint32_t MeasureFront();
+    uint32_t MeasureRear();   
+    static uint32_t                  ultrasound_pulse_start;
+    static uint32_t                  ultrasound_pulse_duration;
+    static void     UltrasoundIRQCallback(   uint, uint32_t);
+   
   private:
     Servo                     radar_turret;
     steering_motor_direction  last_steering_motor_direction;
@@ -49,9 +53,8 @@ class Radar
 
     void     TurretRotationSequencer();
     void     RotateTurret(int16_t);
-    uint8_t  TurretDirection();
-    uint32_t MeasureFront();
-    uint32_t MeasureRear();
+    int8_t   GetTurretDirection();
+
     float    Measure(                 uint8_t, uint8_t );
     void     DataDebug();
     void     ServoDiagnostics();
@@ -61,17 +64,13 @@ class Radar
     void     DecodeFifo(              uint32_t);
     int16_t  ConvertServoAngleToCarAngle(uint8_t);
     uint8_t  ConvertCarAngleToServoAngle(int16_t);
-
-    uint32_t PulseIn( uint32_t, uint32_t, uint32_t ) ;
+    float    PulseIn(                 uint32_t);
 
     bool     Turning();
     bool     TurningLeft();
     bool     TurningRight();
     bool     DirectionIsForward();
     bool     DirectionIsReverse();
-
-    uint8_t  radar_turret_angle; // 0-180
-
 
 };
 
