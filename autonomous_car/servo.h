@@ -20,9 +20,11 @@ class Servo
     public:
       Servo();
       void SetDegrees(float);
+      uint8_t GetDegrees();
 
     private:
       uint8_t    servo_pin;
+      uint8_t    servo_degrees; //0-180
       uint16_t   servo_pwm_slice;
       pwm_config servo_pwm_config;
  

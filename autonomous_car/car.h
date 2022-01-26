@@ -43,6 +43,7 @@ class Car
     void Iterator();
     void HazardLightsOn();
     void HazardLightsOff();
+    void DumpRadarMetrics();
 
   private:
   

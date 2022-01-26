@@ -24,17 +24,18 @@ Servo::Servo()
 
 // Control a servo by degrees
 
-void Servo::SetDegrees(float servo_angle)
+void Servo::SetDegrees(float target_servo_degrees)
 {
   float pwm_pulse_length_us;
   uint16_t gpio_level;
 
-  servo_angle = (servo_angle>180)?180:servo_angle;
-  servo_angle = (servo_angle<  0)?  0:servo_angle;
-  
+  target_servo_degrees = (target_servo_degrees>180)?180:target_servo_degrees;
+  target_servo_degrees = (target_servo_degrees<  0)?  0:target_servo_degrees;
+  servo_degrees = target_servo_degrees;
+
   pwm_pulse_length_us = SERVO_PWM_MIN_PULSE_LENGTH_US +
                         (
-                          servo_angle
+                          target_servo_degrees
                           *(
                             (SERVO_PWM_MAX_PULSE_LENGTH_US-SERVO_PWM_MIN_PULSE_LENGTH_US)
                             /180.f
@@ -51,4 +52,9 @@ void Servo::SetDegrees(float servo_angle)
   while(pwm_get_counter( servo_pwm_slice )<((SERVO_PWM_MAX_PULSE_LENGTH_US/SERVO_PWM_CYCLE_LENGTH_US)*SERVO_PWM_CONFIG_TOP));
   
   pwm_set_gpio_level(RADAR_TURRET_PIN, gpio_level);
+}
+
+uint8_t Servo::GetDegrees()
+{
+  return servo_degrees;
 }

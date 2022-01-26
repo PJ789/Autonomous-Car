@@ -85,7 +85,7 @@ void Car::SetLights()
 {
   if (Stopped())
   {
-    lights.Flash();
+    HazardLightsOn();
     return;
   }
 
@@ -625,37 +625,54 @@ void Car::DecodeFifo(uint32_t fifo_message)
   uint8_t angle;
   uint8_t range;
 
-  if (fifo_message == RADAR_READY_FIFO_MESSAGE )
+  if (fifo_message == RADAR_READY_FIFO_MESSAGE)
   {
     lights.RearLeftFlash();
+    Serial.println("Radar ready received");
     printf("Radar ready received\n");
     return;
   }
   lights.RearRightFlash();
 
-  for(int i=0; i<5; i++) decoded_message[i]=0;
+  for(uint8_t i=0; i<5; i++) decoded_message[i]=0;
   decoded_message[0] = (fifo_message & 0xFF000000) >> 24;
   decoded_message[1] = (fifo_message & 0x00FF0000) >> 16;
 
+  Serial.print(fifo_message);
+  Serial.print(":");
+  Serial.println(decoded_message);
   printf("%lu - [%s]\n", fifo_message, decoded_message );
 
   switch (decoded_message[0])
   {
     case 'R': // radar measurement
-      angle = (uint8_t) ((fifo_message & 0x0000FF00) >> 16);
-      range = (uint8_t)  (fifo_message & 0x000000FF);
-      index = (uint8_t) (angle / RADAR_MEASUREMENTS_GRANULARITY);
+      angle = ((fifo_message & 0x0000FF00) >> 8);
+      range = (fifo_message & 0x000000FF);
+      index = (angle / RADAR_MEASUREMENTS_GRANULARITY);
       switch (decoded_message[1])
       {
         case 'F': // forward
+          Serial.println("Radar forward measurement received");
+          Serial.print(angle);
+          Serial.print("/");
+          Serial.print(range);
+          Serial.print("/");
+          Serial.println(index);
           printf("Radar forward measurement received (range/angle/index):%iu/%iu/%iu\n", angle, range, index);
           radar_forward_measurements[index] = range;
           break;
         case 'R': // rearward
+          Serial.println("Radar rearward measurement received");
+          Serial.print(angle);
+          Serial.print("/");
+          Serial.print(range);
+          Serial.print("/");
+          Serial.println(index);
           printf("Radar rearward measurement received (range/angle/index):%iu/%iu/%iu\n", angle, range, index);
           radar_rearward_measurements[index] = range;
           break;
         default:
+          Serial.println("Unrecognised radar message type received");
           printf("Unrecognised radar message type [%c][%s]\n", decoded_message[1], decoded_message);
           break;
       }
@@ -673,4 +690,22 @@ int16_t Car::ConvertServoAngleToCarAngle(uint8_t angle)
 uint8_t Car::ConvertCarAngleToRadarAngle(int16_t angle)
 {
   return (90-angle);
+}
+
+void Car::DumpRadarMetrics()
+{
+  Serial.println("........................................................................................");
+  for(int16_t r=0; r<RADAR_MEASUREMENTS; r++)
+  {
+    Serial.print(r*RADAR_MEASUREMENTS_GRANULARITY);
+    Serial.print(":\t");
+    Serial.print(ConvertServoAngleToCarAngle(r*RADAR_MEASUREMENTS_GRANULARITY));
+    Serial.print(":\t");
+    Serial.print(radar_forward_measurements[ r]);
+    Serial.print(",\t");
+    Serial.print(radar_rearward_measurements[r]);
+    Serial.println();
+  }
+    Serial.println("........................................................................................");
+  
 }
