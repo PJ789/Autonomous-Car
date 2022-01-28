@@ -52,6 +52,7 @@ void Radar::Iterator()
     
   if (multicore_fifo_wready())
     multicore_fifo_push_blocking( RADAR_READY_FIFO_MESSAGE );
+
 }
 void Radar::SetRadarActivePin()
 {
@@ -68,7 +69,9 @@ void Radar::TurretRotationSequencer()
 
   if ( Turning() )
   {
-    radar_sequence = (time_millis / ((2 * RADAR_ECHO_TIMEOUT_MILLIS) + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE))) % 4;
+//    radar_sequence = (time_millis / ((2 * RADAR_ECHO_TIMEOUT_MILLIS) + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE))) % 4;
+    radar_sequence = (time_millis / (400)) % 4;
+
     if (
         (DirectionIsForward() && TurningLeft())
         ||
@@ -110,7 +113,8 @@ void Radar::TurretRotationSequencer()
   }
   else
   {
-    radar_sequence = (time_millis / ((2 * RADAR_ECHO_TIMEOUT_MILLIS) + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE))) % RADAR_SCAN_STEPS;
+//    radar_sequence = (time_millis / ((2 * RADAR_ECHO_TIMEOUT_MILLIS) + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE))) % RADAR_SCAN_STEPS;
+    radar_sequence = (time_millis / (400)) % RADAR_SCAN_STEPS;
     switch(radar_sequence) {
       case 0:
         target_radar_turret_angle = (  2 * RADAR_SCAN_STEP_DEGREES );

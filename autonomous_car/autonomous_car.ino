@@ -10,14 +10,13 @@ Serial.begin(250000);
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB
   }
-Serial.println("hello world");
-  printf("Starting car on core 0\n");
+  Serial.println("hello world");
 
-  printf("Starting radar on core 1\n");
+  Serial.println("Starting radar on core 1\n");
   multicore_reset_core1();
   multicore_launch_core1(radar_loop);
      
-  printf("Waiting for radar ready signal\n");
+  Serial.println("Waiting for radar ready signal\n");
   uint32_t fifo_message = 0;
   do
   {
@@ -25,6 +24,7 @@ Serial.println("hello world");
     car.HazardLightsOn();
   }
   while ( fifo_message != RADAR_READY_FIFO_MESSAGE );
+  Serial.println("Radar ready!\n");
   car.HazardLightsOff();
 
 }
@@ -34,8 +34,6 @@ Serial.println("hello world");
 // Core0 loop - navigation tasks
 void loop()
 {
-  Serial.println("carloop");
-
   car.Iterator();
   car.DumpRadarMetrics();
 }

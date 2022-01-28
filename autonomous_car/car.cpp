@@ -54,7 +54,6 @@ void Car::Iterator()
 
   while (multicore_fifo_pop_timeout_us(200, &fifo_message))
   {
-    printf("fifo message received on core0\n");
     DecodeFifo( fifo_message );
   }
 
@@ -63,23 +62,21 @@ void Car::Iterator()
     printf("Collision Avoidance!\n");
     EmergencyStop();
   }
-  else
-  {
-    printf("Plan route\n");
-    PlanRoute();
-    printf("Plan speed\n");
-    PlanSpeed();
-  }
+
+  printf("Plan route\n");
+  PlanRoute();
+  printf("Plan speed\n");
+  PlanSpeed();
 
   SetLights();
 }
 void Car::HazardLightsOn()
 {
-    lights.FrontLeftFlash();
+    lights.Flash();
 }
 void Car::HazardLightsOff()
 {
-    lights.FrontLeftOff();
+    lights.Off();
 }
 void Car::SetLights()
 {
@@ -371,8 +368,6 @@ bool Car::TurningRight()
 }
 bool Car::ObstacleDetectedAhead(float range_limit)
 {
-  printf("Obstacle detected ahead\n");
-
   float range = 0;
   uint16_t start_index = -1;
   uint16_t end_index = 1;
@@ -389,14 +384,17 @@ bool Car::ObstacleDetectedAhead(float range_limit)
     end_index   = 2;
   }
 
-  for (uint16_t i = start_index; i <= end_index; i++)
+  for (int16_t i = start_index; i <= end_index; i++)
   {
     range = GetRadarForwardMeasurements(i * RADAR_SCAN_STEP_DEGREES);
     if (range < range_limit)
     {
-      printf("Obstacle ahead. Range %f cm (min %f cm) @angle=%iu \n",
-             range, range_limit, i * RADAR_SCAN_STEP_DEGREES);
-
+      Serial.print("Obstacle ahead. Range ");
+      Serial.print(range);
+      Serial.print(" cm (min ");
+      Serial.print(range_limit);
+      Serial.print(" cm) @angle=");
+      Serial.println(i * RADAR_SCAN_STEP_DEGREES);
       obstacle_detected = true;
     }
 
@@ -405,8 +403,6 @@ bool Car::ObstacleDetectedAhead(float range_limit)
 }
 bool Car::ObstacleDetectedBehind(float range_limit)
 {
-  printf("Obstacle detected behind\n");
-
   float range = 0;
   uint16_t start_index = -1;
   uint16_t end_index = 1;
@@ -423,14 +419,17 @@ bool Car::ObstacleDetectedBehind(float range_limit)
     end_index   = 0;
   }
 
-  for (uint16_t i = start_index; i <= end_index; i++)
+  for (int16_t i = start_index; i <= end_index; i++)
   {
     range = GetRadarRearwardMeasurements(i * RADAR_SCAN_STEP_DEGREES);
     if (range < range_limit)
     {
-      //radar_debug();
-      printf("Obstacle behind. Range %f cm (min %f cm) @angle=%iu \n",
-             range, range_limit, i * RADAR_SCAN_STEP_DEGREES);
+      Serial.print("Obstacle behind. Range ");
+      Serial.print(range);
+      Serial.print(" cm (min ");
+      Serial.print(range_limit);
+      Serial.print(" cm) @angle=");
+      Serial.println(i * RADAR_SCAN_STEP_DEGREES);
 
       obstacle_detected = true;
     }
@@ -440,15 +439,13 @@ bool Car::ObstacleDetectedBehind(float range_limit)
 }
 bool Car::CollisionAvoidance()
 {
-  printf("Crash anticipation\n");
-
   if (DirectionIsForward() && ObstacleDetectedAhead(MINIMUM_FORWARD_RANGE))
   {
-    printf("Vehicle direction is forward, but obstacle too close to front of vehicle!\n");
+    Serial.println("Vehicle direction is forward, but obstacle too close to front of vehicle!");
   }
-  if (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE))
+  else if (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE))
   {
-    printf("Vehicle direction is reverse, but obstacle too close to rear of vehicle!\n");
+    Serial.println("Vehicle direction is reverse, but obstacle too close to rear of vehicle!");
   }
 
   return (
@@ -503,24 +500,25 @@ void Car::EmergencyStop()
   // Power down steering motor
   Steer( none );
 
-  printf("8888888888 888b     d888 8888888888 8888888b.   .d8888b.  8888888888 888b    888  .d8888b. Y88b   d88P\n");
-  printf("888        8888b   d8888 888        888   Y88b d88P  Y88b 888        8888b   888 d88P  Y88b Y88b d88P\n");
-  printf("888        88888b.d88888 888        888    888 888    888 888        88888b  888 888    888  Y88o88P\n");
-  printf("8888888    888Y88888P888 8888888    888   d88P 888        8888888    888Y88b 888 888          Y888P\n");
-  printf("888        888 Y888P 888 888        8888888P'  888  88888 888        888 Y88b888 888           888\n");
-  printf("888        888  Y8P  888 888        888 T88b   888    888 888        888  Y88888 888    888    888\n");
-  printf("888        888   '   888 888        888  T88b  Y88b  d88P 888        888   Y8888 Y88b  d88P    888\n");
-  printf("8888888888 888       888 8888888888 888   T88b  'Y8888P88 8888888888 888    Y888  'Y8888P'     888\n");
-  printf("\n");
-  printf("\n");
-  printf("                           .d8888b. 88888888888 .d88888b.  8888888b.  888\n");
-  printf("                          d88P  Y88b    888    d88P' 'Y88b 888   Y88b 888\n");
-  printf("                          Y88b.         888    888     888 888    888 888\n");
-  printf("                           'Y888b.      888    888     888 888   d88P 888\n");
-  printf("                              'Y88b.    888    888     888 8888888P'  888\n");
-  printf("                                '888    888    888     888 888        Y8P\n");
-  printf("                          Y88b  d88P    888    Y88b. .d88P 888         !\n");
-  printf("                           'Y8888P'     888     'Y88888P'  888        888\n");
+  Serial.println("8888888888 888b     d888 8888888888 8888888b.   .d8888b.  8888888888 888b    888  .d8888b. Y88b   d88P");
+  Serial.println("888        8888b   d8888 888        888   Y88b d88P  Y88b 888        8888b   888 d88P  Y88b Y88b d88P");
+  Serial.println("888        88888b.d88888 888        888    888 888    888 888        88888b  888 888    888  Y88o88P");
+  Serial.println("8888888    888Y88888P888 8888888    888   d88P 888        8888888    888Y88b 888 888          Y888P");
+  Serial.println("888        888 Y888P 888 888        8888888P'  888  88888 888        888 Y88b888 888           888");
+  Serial.println("888        888  Y8P  888 888        888 T88b   888    888 888        888  Y88888 888    888    888");
+  Serial.println("888        888   '   888 888        888  T88b  Y88b  d88P 888        888   Y8888 Y88b  d88P    888");
+  Serial.println("8888888888 888       888 8888888888 888   T88b  'Y8888P88 8888888888 888    Y888  'Y8888P'     888");
+  Serial.println("");
+  Serial.println("");
+  Serial.println("                           .d8888b. 88888888888 .d88888b.  8888888b.  888");
+  Serial.println("                          d88P  Y88b    888    d88P' 'Y88b 888   Y88b 888");
+  Serial.println("                          Y88b.         888    888     888 888    888 888");
+  Serial.println("                           'Y888b.      888    888     888 888   d88P 888");
+  Serial.println("                              'Y88b.    888    888     888 8888888P'  888");
+  Serial.println("                                '888    888    888     888 888        Y8P");
+  Serial.println("                          Y88b  d88P    888    Y88b. .d88P 888         !");
+  Serial.println("                           'Y8888P'     888     'Y88888P'  888        888");
+
 }
 void Car::Drive( drive_motor_direction direction )
 {
@@ -627,21 +625,14 @@ void Car::DecodeFifo(uint32_t fifo_message)
 
   if (fifo_message == RADAR_READY_FIFO_MESSAGE)
   {
-    lights.RearLeftFlash();
-    Serial.println("Radar ready received");
-    printf("Radar ready received\n");
+    //lights.RearLeftFlash();
     return;
   }
-  lights.RearRightFlash();
+  //lights.RearRightFlash();
 
   for(uint8_t i=0; i<5; i++) decoded_message[i]=0;
   decoded_message[0] = (fifo_message & 0xFF000000) >> 24;
   decoded_message[1] = (fifo_message & 0x00FF0000) >> 16;
-
-  Serial.print(fifo_message);
-  Serial.print(":");
-  Serial.println(decoded_message);
-  printf("%lu - [%s]\n", fifo_message, decoded_message );
 
   switch (decoded_message[0])
   {
@@ -652,33 +643,16 @@ void Car::DecodeFifo(uint32_t fifo_message)
       switch (decoded_message[1])
       {
         case 'F': // forward
-          Serial.println("Radar forward measurement received");
-          Serial.print(angle);
-          Serial.print("/");
-          Serial.print(range);
-          Serial.print("/");
-          Serial.println(index);
-          printf("Radar forward measurement received (range/angle/index):%iu/%iu/%iu\n", angle, range, index);
           radar_forward_measurements[index] = range;
           break;
         case 'R': // rearward
-          Serial.println("Radar rearward measurement received");
-          Serial.print(angle);
-          Serial.print("/");
-          Serial.print(range);
-          Serial.print("/");
-          Serial.println(index);
-          printf("Radar rearward measurement received (range/angle/index):%iu/%iu/%iu\n", angle, range, index);
           radar_rearward_measurements[index] = range;
           break;
         default:
-          Serial.println("Unrecognised radar message type received");
-          printf("Unrecognised radar message type [%c][%s]\n", decoded_message[1], decoded_message);
           break;
       }
       break;
     default:
-      printf("Unrecognised message type [%c][%s]\n", decoded_message[0], decoded_message);
       break;
   }
 }
@@ -694,6 +668,7 @@ uint8_t Car::ConvertCarAngleToRadarAngle(int16_t angle)
 
 void Car::DumpRadarMetrics()
 {
+  Serial.print(CLEAR);
   Serial.println("........................................................................................");
   for(int16_t r=0; r<RADAR_MEASUREMENTS; r++)
   {
