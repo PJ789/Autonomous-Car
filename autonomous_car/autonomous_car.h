@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 
+#define CLEAR "\033[2J"
 #define TIMEWAIT_MILLIS(X) busy_wait_us((X)*1000)
 #define TIMEWAIT_MICROS(X) busy_wait_us_32(X)
 

@@ -10,9 +10,9 @@ Servo::Servo()
   servo_pwm_slice = pwm_gpio_to_slice_num(RADAR_TURRET_PIN);
 
   servo_pwm_config     = pwm_get_default_config();
-  servo_pwm_config.top = SERVO_PWM_CONFIG_TOP;
+  servo_pwm_config.top = SERVO_PWM_CONFIG_TOP_LEVEL;
 
-  float default_frequency_clk_sys_hz = clock_get_hz(clk_sys)/SERVO_PWM_CONFIG_TOP;
+  float default_frequency_clk_sys_hz = clock_get_hz(clk_sys)/SERVO_PWM_CONFIG_TOP_LEVEL;
   float clock_divider                = default_frequency_clk_sys_hz/pwm_target_frequency_hz;
 
   pwm_config_set_clkdiv(&servo_pwm_config, clock_divider);
@@ -37,19 +37,22 @@ void Servo::SetDegrees(float target_servo_degrees)
                         (
                           target_servo_degrees
                           *(
-                            (SERVO_PWM_MAX_PULSE_LENGTH_US-SERVO_PWM_MIN_PULSE_LENGTH_US)
-                            /180.f
+                            SERVO_PWM_PULSE_LENGTH_RANGE_US
+                            /SERVO_ROTATION_RANGE_DEGREES
                           )
                         );
 
-  gpio_level = (pwm_pulse_length_us/SERVO_PWM_CYCLE_LENGTH_US)*SERVO_PWM_CONFIG_TOP;
+  gpio_level = (pwm_pulse_length_us/SERVO_PWM_CYCLE_LENGTH_US)*SERVO_PWM_CONFIG_TOP_LEVEL;
 
   // allow pwm cycle to complete to smooth transitions
   // max pulse is circa 2000-2500 in a 20000us cycle.
   // so wait until we're in the second half of the
   // cycle (ie, pulse output low)
-  while(pwm_get_counter( servo_pwm_slice )>((SERVO_PWM_MAX_PULSE_LENGTH_US/SERVO_PWM_CYCLE_LENGTH_US)*SERVO_PWM_CONFIG_TOP));
-  while(pwm_get_counter( servo_pwm_slice )<((SERVO_PWM_MAX_PULSE_LENGTH_US/SERVO_PWM_CYCLE_LENGTH_US)*SERVO_PWM_CONFIG_TOP));
+  while(
+    (pwm_get_counter( servo_pwm_slice )<SERVO_PWM_MAX_PULSE_LEVEL)
+    ||
+    (pwm_get_counter( servo_pwm_slice )>(SERVO_PWM_CONFIG_TOP_LEVEL - SERVO_PWM_MAX_PULSE_LEVEL))
+    );
   
   pwm_set_gpio_level(RADAR_TURRET_PIN, gpio_level);
 }
