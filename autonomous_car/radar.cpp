@@ -42,8 +42,9 @@ void Radar::Iterator()
 {
   uint32_t fifo_message;
 
-  while (multicore_fifo_pop_timeout_us(200, &fifo_message))
+  while (multicore_fifo_rvalid())
   {
+    fifo_message = multicore_fifo_pop_blocking();
     printf("fifo message received on core1\n");
     DecodeFifo( fifo_message );
   }
@@ -135,36 +136,48 @@ void Radar::TurretRotationSequencer()
         break;
     }
   }
-  else if (Stopped())
+  else //if (Stopped())
   {
     // base interval, plus 2* ultrasound measurements plus rotation time
     rotation_interval_ms = 100 +(2*RADAR_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
-    rotation_steps       = 8;
+    rotation_steps       = 12;
     radar_sequence = ( time_millis / rotation_interval_ms ) % rotation_steps;
     switch(radar_sequence) {
       case 0:
-        target_radar_turret_angle = (  2 * RADAR_SCAN_STEP_DEGREES );
+        target_radar_turret_angle = (  3 * RADAR_SCAN_STEP_DEGREES );
         break;
       case 1:
-        target_radar_turret_angle = (  1 * RADAR_SCAN_STEP_DEGREES );
+        target_radar_turret_angle = (  2 * RADAR_SCAN_STEP_DEGREES );
         break;
       case 2:
-        target_radar_turret_angle = (  0 );
+        target_radar_turret_angle = (  1 * RADAR_SCAN_STEP_DEGREES );
         break;
       case 3:
-        target_radar_turret_angle = ( -1 * RADAR_SCAN_STEP_DEGREES );
-        break;
-      case 4:
-        target_radar_turret_angle = ( -2 * RADAR_SCAN_STEP_DEGREES );
-        break;
-      case 5:
-        target_radar_turret_angle = ( -1 * RADAR_SCAN_STEP_DEGREES );
-        break;
-      case 6:
         target_radar_turret_angle = (  0 );
         break;
+      case 4:
+        target_radar_turret_angle = ( -1 * RADAR_SCAN_STEP_DEGREES );
+        break;
+      case 5:
+        target_radar_turret_angle = ( -2 * RADAR_SCAN_STEP_DEGREES );
+        break;
+      case 6:
+        target_radar_turret_angle = ( -3 * RADAR_SCAN_STEP_DEGREES );
+        break;
       case 7:
+        target_radar_turret_angle = ( -2 * RADAR_SCAN_STEP_DEGREES );
+        break;
+      case 8:
+        target_radar_turret_angle = ( -1 * RADAR_SCAN_STEP_DEGREES );
+        break;
+      case 9:
+        target_radar_turret_angle = (  0 );
+        break;
+      case 10:
         target_radar_turret_angle = (  1 * RADAR_SCAN_STEP_DEGREES );
+        break;
+      case 11:
+        target_radar_turret_angle = (  2 * RADAR_SCAN_STEP_DEGREES );
         break;
     }    
   }
@@ -380,7 +393,7 @@ void Radar::DecodeFifo(uint32_t fifo_message)
 
   switch (decoded_message[0])
   {
-    case 'D': // drive direction
+    case 'C': // Car status
       switch (decoded_message[1])
       {
         case 'F': // forward
@@ -391,17 +404,11 @@ void Radar::DecodeFifo(uint32_t fifo_message)
           printf("Drive motor direction reverse signal received");
           Drive(reverse);
           break;
-        case 'S': // speed
-          printf("Drive motor speed received: %i",decoded_message[3]);
-          SetDriveMotorSpeed(decoded_message[3]);
-          break;
         default:
           printf("Unrecognised drive motor message type [%c][%s]\n", decoded_message[1], decoded_message);
           break;
       }
-      break;
-    case 'S': // steering direction
-      switch (decoded_message[1])
+      switch (decoded_message[2])
       {
         case 'L': // left
           printf("Steering motor steer left signal received");
@@ -416,12 +423,13 @@ void Radar::DecodeFifo(uint32_t fifo_message)
           Steer(none);
           break;
         default:
-          printf("Unrecognised steering motor message type [%c][%s]\n", decoded_message[1], decoded_message);
+          printf("Unrecognised steering motor message type [%c][%s]\n", decoded_message[2], decoded_message);
           break;
       }
+      SetDriveMotorSpeed(decoded_message[3]);
       break;
     default:
-      printf("Unrecognised motor message type [%c][%s]\n", decoded_message[0], decoded_message);
+      printf("Unrecognised message type [%c][%s]\n", decoded_message[0], decoded_message);
       break;
   }
 }

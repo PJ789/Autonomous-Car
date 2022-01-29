@@ -70,6 +70,7 @@ class Car
     uint8_t GetRadarRearwardMeasurements(     int8_t );
     int16_t ConvertServoAngleToCarAngle(      uint8_t );
     uint8_t ConvertCarAngleToRadarAngle(      int16_t );
+    void SendStatus();
 
     steering_motor_direction  last_steering_motor_direction;
     drive_motor_direction     last_drive_motor_direction;
