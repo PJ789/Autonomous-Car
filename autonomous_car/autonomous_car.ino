@@ -35,7 +35,7 @@ Serial.begin(250000);
 void loop()
 {
   car.Iterator();
-  car.DumpRadarMetrics();
+  //car.DumpRadarMetrics();
 }
 
 

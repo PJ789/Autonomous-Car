@@ -52,8 +52,10 @@ void Car::Iterator()
 {
   uint32_t fifo_message;
 
-  while (multicore_fifo_pop_timeout_us(200, &fifo_message))
+  while (multicore_fifo_rvalid())
   {
+    fifo_message = multicore_fifo_pop_blocking();
+    printf("fifo message received on core0\n");
     DecodeFifo( fifo_message );
   }
 
@@ -463,6 +465,7 @@ void Car::SetDriveMotorSpeed(uint8_t s)
     printf("No speed change\n");
     return;
   }
+  
   printf("Changing speed from %iu to %iu\n",
          last_drive_motor_speed, s);
 
@@ -483,10 +486,6 @@ void Car::SetDriveMotorSpeed(uint8_t s)
       last_drive_motor_speed = i;
     }
   }
-
-  uint32_t speed_message = DRIVE_SPEED_FIFO_MESSAGE | s;
-  multicore_fifo_push_timeout_us(speed_message,1000);
-
 }
 void Car::EmergencyStop()
 {
@@ -494,12 +493,17 @@ void Car::EmergencyStop()
 
   // Power down drive motor
   pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, 0);
-  last_drive_motor_speed = 0;
-  // Power down main motor relay - causes strange behavior if vehicle is in reverse with obstacle behind
-  // Drive( forward );
   // Power down steering motor
-  Steer( none );
+  gpio_put(STEERING_MOTOR_SPEED_PIN, false );
+  // Power down steering relay
+  gpio_put(DRIVE_MOTOR_DIRECTION_PIN, false );
+  // Power down steering motor
+  gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
 
+  Drive(forward);
+  SetDriveMotorSpeed(0);
+  Steer(none);
+  
   Serial.println("8888888888 888b     d888 8888888888 8888888b.   .d8888b.  8888888888 888b    888  .d8888b. Y88b   d88P");
   Serial.println("888        8888b   d8888 888        888   Y88b d88P  Y88b 888        8888b   888 d88P  Y88b Y88b d88P");
   Serial.println("888        88888b.d88888 888        888    888 888    888 888        88888b  888 888    888  Y88o88P");
@@ -522,8 +526,6 @@ void Car::EmergencyStop()
 }
 void Car::Drive( drive_motor_direction direction )
 {
-  int s = last_drive_motor_speed;
-
   // Change direction
   switch (direction) {
     case forward:
@@ -537,10 +539,8 @@ void Car::Drive( drive_motor_direction direction )
       } else
       {
         printf("Maintaining forward direction\n");
-
       }
       last_drive_motor_direction = forward;
-      multicore_fifo_push_timeout_us(DRIVE_FORWARD_FIFO_MESSAGE,1000);
       break;
     case reverse:
       if (!DirectionIsReverse())
@@ -553,15 +553,11 @@ void Car::Drive( drive_motor_direction direction )
       } else
       {
         printf("Maintaining reverse direction\n");
-
       }
       last_drive_motor_direction = reverse;
-      multicore_fifo_push_timeout_us(DRIVE_REVERSE_FIFO_MESSAGE,1000);
       break;
   }
 
-  // Accelerate back to speed
-  SetDriveMotorSpeed( s );
 }
 void Car::Steer( steering_motor_direction direction )
 {
@@ -573,8 +569,6 @@ void Car::Steer( steering_motor_direction direction )
 
       gpio_put(STEERING_MOTOR_DIRECTION_PIN, true );
       gpio_put(STEERING_MOTOR_SPEED_PIN, true );
-
-      multicore_fifo_push_timeout_us(STEER_LEFT_FIFO_MESSAGE,1000);
       break;
     case right:
       last_steering_motor_direction = right;
@@ -582,8 +576,6 @@ void Car::Steer( steering_motor_direction direction )
 
       gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
       gpio_put(STEERING_MOTOR_SPEED_PIN, true );
-
-      multicore_fifo_push_timeout_us(STEER_RIGHT_FIFO_MESSAGE,1000);
       break;
     default:
       last_steering_motor_direction = none;
@@ -591,8 +583,6 @@ void Car::Steer( steering_motor_direction direction )
 
       gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
       gpio_put(STEERING_MOTOR_SPEED_PIN, false );
-
-      multicore_fifo_push_timeout_us(STEER_NONE_FIFO_MESSAGE,1000);
       break;
   }
 }
@@ -625,10 +615,9 @@ void Car::DecodeFifo(uint32_t fifo_message)
 
   if (fifo_message == RADAR_READY_FIFO_MESSAGE)
   {
-    //lights.RearLeftFlash();
+    SendStatus();
     return;
   }
-  //lights.RearRightFlash();
 
   for(uint8_t i=0; i<5; i++) decoded_message[i]=0;
   decoded_message[0] = (fifo_message & 0xFF000000) >> 24;
@@ -666,6 +655,37 @@ uint8_t Car::ConvertCarAngleToRadarAngle(int16_t angle)
   return (90-angle);
 }
 
+void Car::SendStatus()
+{
+  uint32_t message = CAR_FIFO_MESSAGE;
+  message = message & 0xFF000000; // C___
+  
+  switch (last_steering_motor_direction) {
+  case left:
+    message = message | 'L' << 8;
+    break;
+  case right:
+    message = message | 'R' << 8;
+    break;
+  default:
+    message = message | 'N' << 8;
+    break;      
+  }
+
+  switch (last_drive_motor_direction) {
+    case forward:
+      message = message | 'F' << 16;
+      break;
+    case reverse:
+      message = message | 'R' << 16;
+      break;
+  }
+
+  message = message | last_drive_motor_speed;
+
+  if (multicore_fifo_wready())
+    multicore_fifo_push_blocking( message ); 
+}
 void Car::DumpRadarMetrics()
 {
   Serial.print(CLEAR);

@@ -26,13 +26,7 @@ enum steering_motor_direction {
 // Forward Range angle distance
 #define RADAR_FORWARD_RANGE_FIFO_MESSAGE   ENCODE_FIFO_MESSAGE("RFad")
 
-// Drive motor forward, reverse, speed
-#define DRIVE_FORWARD_FIFO_MESSAGE ENCODE_FIFO_MESSAGE("DFWD")
-#define DRIVE_REVERSE_FIFO_MESSAGE ENCODE_FIFO_MESSAGE("DREV")
-#define DRIVE_SPEED_FIFO_MESSAGE   ENCODE_FIFO_MESSAGE("DSPs")
+// Car - forward/reverse | left/right/none | speed
+#define CAR_FIFO_MESSAGE ENCODE_FIFO_MESSAGE("Cdts")
 
-// Steering motor left, right, none
-#define STEER_LEFT_FIFO_MESSAGE    ENCODE_FIFO_MESSAGE("SLFT")
-#define STEER_RIGHT_FIFO_MESSAGE   ENCODE_FIFO_MESSAGE("SRGH")
-#define STEER_NONE_FIFO_MESSAGE    ENCODE_FIFO_MESSAGE("SNON")
 #endif
