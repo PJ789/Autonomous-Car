@@ -21,7 +21,6 @@
 
 #define RADAR_SERVO_MILLIS_PER_DEGREE   5
 #define RADAR_SCAN_STEP_DEGREES        25
-#define RADAR_SCAN_STEPS                8
 
 // 30000us = 525cm (0.035cm/us)
 #define RADAR_ECHO_TIMEOUT_MICROS       60000
@@ -66,11 +65,15 @@ class Radar
     uint8_t  ConvertCarAngleToServoAngle(int16_t);
     float    PulseIn(                 uint32_t);
 
-    bool     Turning();
-    bool     TurningLeft();
-    bool     TurningRight();
-    bool     DirectionIsForward();
-    bool     DirectionIsReverse();
+    bool Stopped();
+    bool Moving();
+    bool MovingForward();
+    bool MovingBackward();
+    bool DirectionIsForward();
+    bool DirectionIsReverse();
+    bool Turning();
+    bool TurningLeft();
+    bool TurningRight();
 
 };
 
