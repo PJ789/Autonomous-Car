@@ -63,19 +63,23 @@ void Radar::TurretRotationSequencer()
   uint8_t radar_sequence;
   int16_t target_radar_turret_angle;
   uint64_t time_millis;
+  uint64_t rotation_interval_ms;
+  uint64_t rotation_steps;
 
    // use pico api to avoid core crashing on millis
   time_millis=time_us_64()/1000;
 
   if ( Turning() )
   {
-//    radar_sequence = (time_millis / ((2 * RADAR_ECHO_TIMEOUT_MILLIS) + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE))) % 4;
-    radar_sequence = (time_millis / (400)) % 4;
+    // base interval, plus 1* ultrasound measurements plus rotation time
+    rotation_interval_ms = 100 +(RADAR_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
+    rotation_steps       = 4;
+    radar_sequence = ( time_millis /rotation_interval_ms ) % rotation_steps;
 
     if (
-        (DirectionIsForward() && TurningLeft())
+        (MovingForward() && TurningLeft())
         ||
-        (DirectionIsReverse() && TurningRight())
+        (MovingBackward() && TurningRight())
         )
     {
       switch(radar_sequence) {
@@ -111,10 +115,32 @@ void Radar::TurretRotationSequencer()
       }
     }
   }
-  else
+  else if (Moving())
   {
-//    radar_sequence = (time_millis / ((2 * RADAR_ECHO_TIMEOUT_MILLIS) + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE))) % RADAR_SCAN_STEPS;
-    radar_sequence = (time_millis / (400)) % RADAR_SCAN_STEPS;
+    // base interval, plus 1* ultrasound measurements plus rotation time
+    rotation_interval_ms = 100 +(RADAR_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
+    rotation_steps       = 4;
+    radar_sequence = ( time_millis /rotation_interval_ms ) % rotation_steps;
+
+    switch(radar_sequence) {
+      case 0:
+        target_radar_turret_angle = (  1 * RADAR_SCAN_STEP_DEGREES );
+        break;
+      case 1:
+      case 3:
+        target_radar_turret_angle = (  0 );
+        break;
+      case 2:
+        target_radar_turret_angle = ( -1 * RADAR_SCAN_STEP_DEGREES );
+        break;
+    }
+  }
+  else if (Stopped())
+  {
+    // base interval, plus 2* ultrasound measurements plus rotation time
+    rotation_interval_ms = 100 +(2*RADAR_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
+    rotation_steps       = 8;
+    radar_sequence = ( time_millis / rotation_interval_ms ) % rotation_steps;
     switch(radar_sequence) {
       case 0:
         target_radar_turret_angle = (  2 * RADAR_SCAN_STEP_DEGREES );
@@ -140,14 +166,20 @@ void Radar::TurretRotationSequencer()
       case 7:
         target_radar_turret_angle = (  1 * RADAR_SCAN_STEP_DEGREES );
         break;
-    }
+    }    
   }
 
   if (target_radar_turret_angle != GetTurretDirection() )
   {
     RotateTurret(target_radar_turret_angle);
-    MeasureFront();
-    MeasureRear();
+    if ( MovingForward() || Stopped() )
+    {
+      MeasureFront();
+    }
+    if  ( MovingBackward() || Stopped() )
+    {
+      MeasureRear();
+    }
   }
   
 }
@@ -298,6 +330,30 @@ void Radar::Steer( steering_motor_direction d )
 {
   last_steering_motor_direction = d;
 }
+bool Radar::Stopped()
+{
+  return (last_drive_motor_speed == 0);
+}
+bool Radar::Moving()
+{
+  return ( MovingForward() || MovingBackward() );
+}
+bool Radar::MovingForward()
+{
+  return ( (last_drive_motor_direction == forward ) && (last_drive_motor_speed > 0) );
+}
+bool Radar::MovingBackward()
+{
+  return ( (last_drive_motor_direction == reverse ) && (last_drive_motor_speed > 0) );
+}
+bool Radar::DirectionIsForward()
+{
+  return (last_drive_motor_direction == forward);
+}
+bool Radar::DirectionIsReverse()
+{
+  return (last_drive_motor_direction == reverse);
+}
 bool Radar::Turning()
 {
   return ( last_steering_motor_direction != none );
@@ -309,14 +365,6 @@ bool Radar::TurningLeft()
 bool Radar::TurningRight()
 {
   return ( last_steering_motor_direction == right );
-}
-bool Radar::DirectionIsForward()
-{
-  return (last_drive_motor_direction == forward);
-}
-bool Radar::DirectionIsReverse()
-{
-  return (last_drive_motor_direction == reverse);
 }
 void Radar::DecodeFifo(uint32_t fifo_message)
 {
