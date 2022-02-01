@@ -7,7 +7,8 @@
 #include <pico/multicore.h>
 #include <pico/time.h>
 #include "autonomous_car.h"
-#include "servo.h"
+#include "Servo.h"
+#include "Ultrasound.h"
 
  // brown wire - trigger
  // blue wire  - echo
@@ -21,10 +22,6 @@
 
 #define RADAR_SERVO_MILLIS_PER_DEGREE   5
 #define RADAR_SCAN_STEP_DEGREES        25
-
-// 30000us = 525cm (0.035cm/us)
-#define RADAR_ECHO_TIMEOUT_MICROS       60000
-#define RADAR_ECHO_TIMEOUT_MILLIS       (RADAR_ECHO_TIMEOUT_MICROS/1000)
 
 #define RADAR_MEASUREMENTS_GRANULARITY  5
 #define RADAR_MEASUREMENTS              1+(180/RADAR_MEASUREMENTS_GRANULARITY) 
@@ -40,9 +37,8 @@ class Radar
     void     SetRadarActivePin();
     uint32_t MeasureFront();
     uint32_t MeasureRear();   
-    static uint32_t                  ultrasound_pulse_start;
-    static uint32_t                  ultrasound_pulse_duration;
-    static void     UltrasoundIRQCallback(   uint, uint32_t);
+    Ultrasound front_ultrasound;
+    Ultrasound rear_ultrasound;
    
   private:
     Servo                     radar_turret;
@@ -54,7 +50,6 @@ class Radar
     void     RotateTurret(int16_t);
     int8_t   GetTurretDirection();
 
-    float    Measure(                 uint8_t, uint8_t );
     void     DataDebug();
     void     ServoDiagnostics();
     void     SetDriveMotorSpeed(      uint8_t );
@@ -63,7 +58,6 @@ class Radar
     void     DecodeFifo(              uint32_t);
     int16_t  ConvertServoAngleToCarAngle(uint8_t);
     uint8_t  ConvertCarAngleToServoAngle(int16_t);
-    float    PulseIn(                 uint32_t);
 
     bool Stopped();
     bool Moving();
