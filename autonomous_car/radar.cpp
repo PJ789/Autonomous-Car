@@ -1,26 +1,7 @@
 #include "Radar.h"
 
-Radar::Radar()
+Radar::Radar():front_ultrasound(FRONT_ULTRASOUND_TRIG_PIN,FRONT_ULTRASOUND_ECHO_PIN),rear_ultrasound(REAR_ULTRASOUND_TRIG_PIN,REAR_ULTRASOUND_ECHO_PIN)
 {
-  _gpio_init(FRONT_ULTRASOUND_TRIG_PIN);
-  gpio_set_dir(FRONT_ULTRASOUND_TRIG_PIN, GPIO_OUT);
-  
-  _gpio_init(FRONT_ULTRASOUND_ECHO_PIN);
-  gpio_set_dir(FRONT_ULTRASOUND_ECHO_PIN, GPIO_IN);
-  gpio_pull_down(FRONT_ULTRASOUND_ECHO_PIN);
-  gpio_set_input_enabled(FRONT_ULTRASOUND_ECHO_PIN, true);
-  gpio_set_irq_enabled_with_callback(FRONT_ULTRASOUND_ECHO_PIN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &UltrasoundIRQCallback);
-
-  _gpio_init(REAR_ULTRASOUND_TRIG_PIN);
-  gpio_set_dir(REAR_ULTRASOUND_TRIG_PIN, GPIO_OUT);
-  
-  _gpio_init(REAR_ULTRASOUND_ECHO_PIN);
-  gpio_set_dir(REAR_ULTRASOUND_ECHO_PIN, GPIO_IN);
-  gpio_pull_down(REAR_ULTRASOUND_ECHO_PIN);
-  gpio_set_input_enabled(REAR_ULTRASOUND_ECHO_PIN, true);
-  gpio_set_irq_enabled_with_callback(REAR_ULTRASOUND_ECHO_PIN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &UltrasoundIRQCallback);
-
-
   _gpio_init( RADAR_ACTIVE_PIN);
   gpio_set_dir( RADAR_ACTIVE_PIN,    GPIO_OUT);
   gpio_put(RADAR_ACTIVE_PIN, false);
@@ -73,7 +54,7 @@ void Radar::TurretRotationSequencer()
   if ( Turning() )
   {
     // base interval, plus 1* ultrasound measurements plus rotation time
-    rotation_interval_ms = 100 +(RADAR_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
+    rotation_interval_ms = 100 +(ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
     rotation_steps       = 4;
     radar_sequence = ( time_millis /rotation_interval_ms ) % rotation_steps;
 
@@ -119,7 +100,7 @@ void Radar::TurretRotationSequencer()
   else if (Moving())
   {
     // base interval, plus 1* ultrasound measurements plus rotation time
-    rotation_interval_ms = 100 +(RADAR_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
+    rotation_interval_ms = 100 +(ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
     rotation_steps       = 4;
     radar_sequence = ( time_millis /rotation_interval_ms ) % rotation_steps;
 
@@ -139,7 +120,7 @@ void Radar::TurretRotationSequencer()
   else //if (Stopped())
   {
     // base interval, plus 2* ultrasound measurements plus rotation time
-    rotation_interval_ms = 100 +(2*RADAR_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
+    rotation_interval_ms = 100 +(2*ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
     rotation_steps       = 12;
     radar_sequence = ( time_millis / rotation_interval_ms ) % rotation_steps;
     switch(radar_sequence) {
@@ -223,7 +204,7 @@ uint32_t Radar::MeasureFront()
   uint32_t range;
   uint32_t measurement_message;
 
-  range = Measure( FRONT_ULTRASOUND_TRIG_PIN,FRONT_ULTRASOUND_ECHO_PIN );
+  range = front_ultrasound.Measure();
   range = (range > 255)?255:range;
 
   measurement_message = RADAR_FORWARD_RANGE_FIFO_MESSAGE;
@@ -241,7 +222,7 @@ uint32_t Radar::MeasureRear()
   uint32_t range;
   uint32_t measurement_message;
 
-  range = Measure( REAR_ULTRASOUND_TRIG_PIN,REAR_ULTRASOUND_ECHO_PIN );
+  range = rear_ultrasound.Measure();
   range = (range > 255)?255:range;
 
   measurement_message = RADAR_REAR_RANGE_FIFO_MESSAGE;
@@ -253,28 +234,6 @@ uint32_t Radar::MeasureRear()
     multicore_fifo_push_blocking(measurement_message);
 
   return range;
-}
-float Radar::Measure( uint8_t trigger, uint8_t echo )
-{
-  float distance;
-  float echo_duration;
-
-  // 10us pulse on trigger pin
-  gpio_put(trigger, false);
-  TIMEWAIT_MICROS(2);
-  gpio_put(trigger, true);
-  TIMEWAIT_MICROS(10);
-  gpio_put(trigger, false);
-
-  sleep_us( RADAR_ECHO_TIMEOUT_MICROS ); 
-
-  // Read echo time
-  echo_duration = Radar::ultrasound_pulse_duration;;
-  
-  // Speed of ultrasound 350m/s (0.035cm/us)
-  distance = echo_duration * 0.035 / 2.0; 
-
-  return distance;
 }
 void Radar::ServoDiagnostics()
 {
@@ -433,25 +392,6 @@ void Radar::DecodeFifo(uint32_t fifo_message)
       break;
   }
 }
-uint32_t                  Radar::ultrasound_pulse_start;
-uint32_t                  Radar::ultrasound_pulse_duration;
-void Radar::UltrasoundIRQCallback(uint gpio, uint32_t events) {
-
-  if (events & GPIO_IRQ_EDGE_RISE )
-  {
-    gpio_put(RADAR_ACTIVE_PIN, true);
-    Radar::ultrasound_pulse_start    = time_us_32();
-    Radar::ultrasound_pulse_duration = 0;
-  }
-  if (events & GPIO_IRQ_EDGE_FALL)
-  {
-    gpio_put(RADAR_ACTIVE_PIN, false);
-    Radar::ultrasound_pulse_duration = time_us_32()-Radar::ultrasound_pulse_start;
-    Radar::ultrasound_pulse_duration = (Radar::ultrasound_pulse_duration<(RADAR_ECHO_TIMEOUT_MICROS/2))?Radar::ultrasound_pulse_duration:0;
-    Radar::ultrasound_pulse_start    = 0;
-  }
-}
-
 int16_t Radar::ConvertServoAngleToCarAngle(uint8_t servo_angle)
 {
   int16_t car_angle;
