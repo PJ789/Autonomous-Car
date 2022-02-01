@@ -146,7 +146,11 @@ void Car::PlanRoute()
       {
         if (TurningLeft())
         {
-          if (GetRadarForwardMeasurements(LEFT2)>GetRadarForwardMeasurements(DEAD_AHEAD))
+          if (
+              (GetRadarForwardMeasurements(LEFT2)+GetRadarForwardMeasurements(LEFT1))
+              >
+              (GetRadarForwardMeasurements(LEFT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
+             )
           {
             Serial.println("Plan Route; decision: steer left->left, drive forward\n");
             Steer(left);
@@ -159,7 +163,11 @@ void Car::PlanRoute()
         } else
         if (TurningRight())
         {
-          if (GetRadarForwardMeasurements(RIGHT2)>GetRadarForwardMeasurements(DEAD_AHEAD))
+          if (
+              (GetRadarForwardMeasurements(RIGHT2)+GetRadarForwardMeasurements(RIGHT1))
+              >
+              (GetRadarForwardMeasurements(RIGHT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
+             )
           {
             Serial.println("Plan Route; decision: steer right->right, drive forward\n");
             Steer(right);
@@ -173,12 +181,20 @@ void Car::PlanRoute()
       }
       else if (!Turning())
       {
-        if (GetRadarForwardMeasurements(LEFT1)<GetRadarForwardMeasurements(RIGHT1))
+        if (
+            (GetRadarForwardMeasurements(DEAD_AHEAD)+GetRadarForwardMeasurements(RIGHT1))
+            >
+            (GetRadarForwardMeasurements(LEFT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
+           )
         {
           Serial.println("Plan Route; decision: steer none->right, drive forward\n");
           Steer(right);
         } else
-        if (GetRadarForwardMeasurements(LEFT1)>GetRadarForwardMeasurements(RIGHT1))
+        if (
+            (GetRadarForwardMeasurements(LEFT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
+            >
+            (GetRadarForwardMeasurements(DEAD_AHEAD)+GetRadarForwardMeasurements(RIGHT1))
+           )
         {
           Serial.println("Plan Route; decision: steer none->left, drive forward\n");
           Steer(left);
@@ -209,7 +225,11 @@ void Car::PlanRoute()
       {
         if (TurningLeft()) // nb right in reverse
         {
-          if (GetRadarRearwardMeasurements(RIGHT2)>GetRadarRearwardMeasurements(DEAD_AHEAD))
+          if (
+              (GetRadarRearwardMeasurements(RIGHT2)+GetRadarRearwardMeasurements(RIGHT1))
+              >
+              (GetRadarRearwardMeasurements(RIGHT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
+             )
           {
             Serial.println("Plan Route; decision: steer left->left, drive reverse\n");
             Steer(left);
@@ -222,7 +242,11 @@ void Car::PlanRoute()
         } else
         if (TurningRight()) // nb left in reverse
         {
-          if (GetRadarRearwardMeasurements(LEFT2)>GetRadarRearwardMeasurements(DEAD_AHEAD))
+          if (
+              (GetRadarRearwardMeasurements(LEFT2)+GetRadarRearwardMeasurements(LEFT1))
+              >
+              (GetRadarRearwardMeasurements(LEFT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
+             )
           {
             Serial.println("Plan Route; decision: steer right->right, drive reverse\n");
             Steer(right);
@@ -236,14 +260,22 @@ void Car::PlanRoute()
       }
       else if (!Turning())
       {
-        if (GetRadarRearwardMeasurements(LEFT1)<GetRadarRearwardMeasurements(RIGHT1))
-        {
-          Serial.println("Plan Route; decision: steer none->right, drive reverse\n");
-          Steer(left);
-        } else
-        if (GetRadarRearwardMeasurements(LEFT1)>GetRadarRearwardMeasurements(RIGHT1))
+        if (
+            (GetRadarRearwardMeasurements(DEAD_AHEAD)+GetRadarRearwardMeasurements(RIGHT1))
+            >
+            (GetRadarRearwardMeasurements(LEFT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
+           )
         {
           Serial.println("Plan Route; decision: steer none->left, drive reverse\n");
+          Steer(left);
+        } else
+        if (
+            (GetRadarRearwardMeasurements(LEFT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
+            >
+            (GetRadarRearwardMeasurements(DEAD_AHEAD)+GetRadarRearwardMeasurements(RIGHT1))
+           )
+        {
+          Serial.println("Plan Route; decision: steer none->right, drive reverse\n");
           Steer(right);
         }
       }
