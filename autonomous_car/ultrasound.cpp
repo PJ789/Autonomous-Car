@@ -29,7 +29,7 @@ float Ultrasound::Measure()
   sleep_us( ULTRASOUND_ECHO_TIMEOUT_MICROS ); 
 
   // Read echo time
-  echo_duration = Ultrasound::ultrasound_pulse_duration;;
+  echo_duration = Ultrasound::ultrasound_pulse_duration;
   
   // Speed of ultrasound 350m/s (0.035cm/us)
   distance = echo_duration * 0.035 / 2.0; 
@@ -38,8 +38,8 @@ float Ultrasound::Measure()
 }
 uint32_t                  Ultrasound::ultrasound_pulse_start;
 uint32_t                  Ultrasound::ultrasound_pulse_duration;
-void Ultrasound::UltrasoundIRQCallback(uint gpio, uint32_t events) {
-
+void Ultrasound::UltrasoundIRQCallback(uint gpio, uint32_t events)
+{
   if (events & GPIO_IRQ_EDGE_RISE )
   {
     Ultrasound::ultrasound_pulse_start    = time_us_32();
