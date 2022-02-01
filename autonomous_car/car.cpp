@@ -31,17 +31,22 @@ Car::Car(): lights()
 
   printf("Testing lights\n");
   lights.Off();
-  for (uint8_t i = 0; i<4; i++)
+  for (uint8_t i = 0; i<9; i++)
   {
-    timeout = make_timeout_time_ms(1500);
+    timeout = make_timeout_time_ms(1000);
     while( !time_reached(timeout) )
     {
       switch(i)
       {
-        case 0: lights.LeftFlash(); break;
-        case 1: lights.RearFlash(); break;
-        case 2: lights.RightFlash(); break;
-        case 3: lights.FrontFlash(); break;
+        case 0: lights.FrontLeftFlash(); break;
+        case 1: lights.RearLeftFlash(); break;
+        case 2: lights.RearRightFlash(); break;
+        case 3: lights.FrontRightFlash(); break;
+        case 4: lights.LeftFlash(); break;
+        case 5: lights.RearFlash(); break;
+        case 6: lights.RightFlash(); break;
+        case 7: lights.FrontFlash(); break;
+        case 8: lights.Flash(); break;
       }
     }
     lights.Off();
@@ -59,16 +64,19 @@ void Car::Iterator()
     DecodeFifo( fifo_message );
   }
 
-  if (CollisionAvoidance() )
-  {
-    printf("Collision Avoidance!\n");
-    EmergencyStop();
-  }
-
   printf("Plan route\n");
   PlanRoute();
-  printf("Plan speed\n");
-  PlanSpeed();
+
+  if (CollisionAvoidance() )
+  {
+    printf("Collision avoidance activated!\n");
+    EmergencyStop();
+  }
+  else
+  {
+    printf("Plan speed\n");
+    PlanSpeed();
+  }
 
   SetLights();
 }
@@ -90,55 +98,94 @@ void Car::SetLights()
 
   if (DirectionIsForward())
   {
+    lights.RearOff();
     if (TurningLeft())
     {
-      lights.LeftFlash();
-      lights.RightOff();
+      lights.FrontLeftFlash();
+      lights.FrontRightOff();
     }
     else if (TurningRight())
     {
-      lights.RightFlash();
-      lights.LeftOff();
+      lights.FrontRightFlash();
+      lights.FrontLeftOff();
     }
     else
     {
       lights.FrontOn();
-      lights.RearOff();
     }
   }
   else if (DirectionIsReverse())
   {
+    lights.FrontOff();
     if (TurningLeft())
     {
-      lights.LeftFlash();
-      lights.RightOff();
+      lights.RearLeftFlash();
+      lights.RearRightOff();
     }
     else if (TurningRight())
     {
-      lights.RightFlash();
-      lights.LeftOff();
+      lights.RearRightFlash();
+      lights.RearLeftOff();
     }
     else
     {
-      lights.FrontOff();
       lights.RearOn();
     }
   }
 }
 void Car::PlanRoute()
 {
-  printf("Plan Route\n");
+  Serial.println("Plan Route\n");
   if (DirectionIsForward())
   {
-    printf("Plan Route; current direction is forward\n");
-    if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE))
+    Serial.println("Plan Route; current direction is forward\n");
+    if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
-      printf("Plan Route; no obstacle ahead\n");
-      printf("Plan Route; decision: steer none, drive forward\n");
-      Steer(none);
-      Drive(forward);
+      Serial.println("Plan Route; no obstacle ahead\n");
+      if (Turning())
+      {
+        if (TurningLeft())
+        {
+          if (GetRadarForwardMeasurements(LEFT2)>GetRadarForwardMeasurements(DEAD_AHEAD))
+          {
+            Serial.println("Plan Route; decision: steer left->left, drive forward\n");
+            Steer(left);
+          }
+          else
+          {
+            Serial.println("Plan Route; decision: steer left->none, drive forward\n");
+            Steer(none);
+          }
+        } else
+        if (TurningRight())
+        {
+          if (GetRadarForwardMeasurements(RIGHT2)>GetRadarForwardMeasurements(DEAD_AHEAD))
+          {
+            Serial.println("Plan Route; decision: steer right->right, drive forward\n");
+            Steer(right);
+          }
+          else
+          {
+            Serial.println("Plan Route; decision: steer right->none, drive forward\n");
+            Steer(none);
+          }
+        }
+      }
+      else if (!Turning())
+      {
+        if (GetRadarForwardMeasurements(LEFT1)<GetRadarForwardMeasurements(RIGHT1))
+        {
+          Serial.println("Plan Route; decision: steer none->right, drive forward\n");
+          Steer(right);
+        } else
+        if (GetRadarForwardMeasurements(LEFT1)>GetRadarForwardMeasurements(RIGHT1))
+        {
+          Serial.println("Plan Route; decision: steer none->left, drive forward\n");
+          Steer(left);
+        }
+      }
     }
-    else if (!(ObstacleDetectedBehind(STEERING_REAR_RANGE)))
+    else if (!(ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT)))
     {
       printf("Plan Route; obstacle ahead, no obstacle behind\n");
       printf("Plan Route; decision: steer none, drive reverse\n");
@@ -150,21 +197,58 @@ void Car::PlanRoute()
       printf("Plan Route; obstacle ahead & behind\n");
       printf("Plan Route; decision: no option to change course\n");
       Steer(none);
-      Drive(forward);
     }
   }
   else if (DirectionIsReverse())
   {
-    printf("Plan Route; current direction is reverse\n");
-
-    if (!(ObstacleDetectedBehind(STEERING_REAR_RANGE)))
+    Serial.println("Plan Route; current direction is reverse\n");
+    if (!ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT))
     {
-      printf("Plan Route; no obstacle behind\n");
-      printf("Plan Route; decision: steer none, drive reverse\n");
-      Steer(none);
-      Drive(reverse);
+      Serial.println("Plan Route; no obstacle behind\n");
+      if (Turning())
+      {
+        if (TurningLeft()) // nb right in reverse
+        {
+          if (GetRadarRearwardMeasurements(RIGHT2)>GetRadarRearwardMeasurements(DEAD_AHEAD))
+          {
+            Serial.println("Plan Route; decision: steer left->left, drive reverse\n");
+            Steer(left);
+          }
+          else
+          {
+            Serial.println("Plan Route; decision: steer left->none, drive reverse\n");
+            Steer(none);
+          }
+        } else
+        if (TurningRight()) // nb left in reverse
+        {
+          if (GetRadarRearwardMeasurements(LEFT2)>GetRadarRearwardMeasurements(DEAD_AHEAD))
+          {
+            Serial.println("Plan Route; decision: steer right->right, drive reverse\n");
+            Steer(right);
+          }
+          else
+          {
+            Serial.println("Plan Route; decision: steer right->none, drive reverse\n");
+            Steer(none);
+          }
+        }
+      }
+      else if (!Turning())
+      {
+        if (GetRadarRearwardMeasurements(LEFT1)<GetRadarRearwardMeasurements(RIGHT1))
+        {
+          Serial.println("Plan Route; decision: steer none->right, drive reverse\n");
+          Steer(left);
+        } else
+        if (GetRadarRearwardMeasurements(LEFT1)>GetRadarRearwardMeasurements(RIGHT1))
+        {
+          Serial.println("Plan Route; decision: steer none->left, drive reverse\n");
+          Steer(right);
+        }
+      }
     }
-    else if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE))
+    else if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
       printf("Plan Route; obstacle behind, no obstacle ahead\n");
       printf("Plan Route; decision: steer none, drive forward\n");
@@ -187,7 +271,7 @@ void Car::PlanSpeed()
 
   if (DirectionIsForward())
   {
-    if (ObstacleDetectedAhead(STEERING_FORWARD_RANGE))
+    if (ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
       printf("Forward Stop\n");
       SetDriveMotorSpeed(0);
@@ -208,7 +292,7 @@ void Car::PlanSpeed()
   }
   else if (DirectionIsReverse())
   {
-    if (ObstacleDetectedBehind(STEERING_REAR_RANGE))
+    if (ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT))
     {
       printf("Reverse Stop\n");
       SetDriveMotorSpeed(0);
@@ -228,110 +312,6 @@ void Car::PlanSpeed()
     }
   }
 }
-/*void Car::PlanRoute1()
-{
-  if (DirectionIsForward())
-  {
-    if (ObstacleDetectedAhead(STEERING_FORWARD_RANGE))
-    {
-      SetDriveMotorSpeed(LOW_SPEED); // slow
-      if (TurningLeft())
-      {
-        Steer(none);
-      }
-      else if (TurningRight())
-      {
-        Steer(none);
-      }
-      else
-      {
-        uint8_t left_distance    = GetRadarForwardMeasurements(-1 * RADAR_SCAN_STEP_DEGREES);
-        uint8_t centre_distance  = GetRadarForwardMeasurements(0 * RADAR_SCAN_STEP_DEGREES);
-        uint8_t right_distance   = GetRadarForwardMeasurements(1 * RADAR_SCAN_STEP_DEGREES);
-        if ( // we can saftely steer to left
-          (left_distance > STEERING_FORWARD_RANGE)
-          &&
-          (centre_distance > STEERING_FORWARD_RANGE)
-          &&
-          (left_distance > right_distance)
-        )
-        {
-          Steerleft;
-        }
-        else if ( // we can saftely steer to right
-          (right_distance > STEERING_FORWARD_RANGE)
-          &&
-          (centre_distance > STEERING_FORWARD_RANGE)
-          &&
-          (right_distance > left_distance)
-        )
-        {
-          Steerright;
-        }
-        else // can't avoid, so reverse
-        {
-          Steer(none);
-          Drive(reverse);
-        }
-      }
-    }
-    else //direction is forward and no obstacle ahead
-    {
-      SetDriveMotorSpeed(HIGH_SPEED); // fast
-    }
-  }
-  else if (DirectionIsReverse())
-  {
-    if (ObstacleDetectedBehind(STEERING_REAR_RANGE))
-    {
-      SetDriveMotorSpeed(LOW_SPEED); // slow
-      if (TurningLeft())
-      {
-        Steer(none);
-      }
-      else if (TurningRight())
-      {
-        Steer(none);
-      }
-      else
-      {
-        uint8_t left_distance    = GetRadarRearwardMeasurements( 1 * RADAR_SCAN_STEP_DEGREES);
-        uint8_t centre_distance  = GetRadarRearwardMeasurements( 0 * RADAR_SCAN_STEP_DEGREES);
-        uint8_t right_distance   = GetRadarRearwardMeasurements(-1 * RADAR_SCAN_STEP_DEGREES);
-
-        if ( // we can saftely steer to left
-          (left_distance > STEERING_REAR_RANGE)
-          &&
-          (centre_distance > STEERING_REAR_RANGE)
-          &&
-          (left_distance > right_distance)
-        )
-        {
-          Steerleft;
-        }
-        else if ( // we can saftely steer to right
-          (right_distance > STEERING_REAR_RANGE)
-          &&
-          (centre_distance > STEERING_REAR_RANGE)
-          &&
-          (right_distance > left_distance)
-        )
-        {
-          Steerright;
-        }
-        else // can't avoid, so go forward
-        {
-          Steer(none);
-          Drive(forward);
-        }
-      }
-    }
-    else //no obstacle behind
-    {
-      SetDriveMotorSpeed(HIGH_SPEED); // fast
-    }
-  }
-}*/
 bool Car::Stopped()
 {
   return (last_drive_motor_speed == 0);
@@ -441,19 +421,19 @@ bool Car::ObstacleDetectedBehind(float range_limit)
 }
 bool Car::CollisionAvoidance()
 {
-  if (DirectionIsForward() && ObstacleDetectedAhead(MINIMUM_FORWARD_RANGE))
+  if (DirectionIsForward() && ObstacleDetectedAhead(MINIMUM_FORWARD_RANGE_LIMIT))
   {
     Serial.println("Vehicle direction is forward, but obstacle too close to front of vehicle!");
   }
-  else if (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE))
+  else if (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE_LIMIT))
   {
     Serial.println("Vehicle direction is reverse, but obstacle too close to rear of vehicle!");
   }
 
   return (
-           (DirectionIsForward() && ObstacleDetectedAhead(MINIMUM_FORWARD_RANGE))
+           (DirectionIsForward() && ObstacleDetectedAhead(MINIMUM_FORWARD_RANGE_LIMIT))
            ||
-           (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE))
+           (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE_LIMIT))
          );
 }
 void Car::SetDriveMotorSpeed(uint8_t s)
@@ -688,7 +668,6 @@ void Car::SendStatus()
 }
 void Car::DumpRadarMetrics()
 {
-  Serial.print(CLEAR);
   Serial.println("........................................................................................");
   for(int16_t r=0; r<RADAR_MEASUREMENTS; r++)
   {

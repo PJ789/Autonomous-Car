@@ -9,10 +9,14 @@
 
 #define LOW_SPEED                   220
 #define HIGH_SPEED                  255
-#define MINIMUM_FORWARD_RANGE        10.0
-#define MINIMUM_REAR_RANGE           10.0
-#define STEERING_FORWARD_RANGE       50.0
-#define STEERING_REAR_RANGE          50.0
+// Minimum range before emergency stop
+// below minimum range the car stops
+#define MINIMUM_FORWARD_RANGE_LIMIT  10.0
+#define MINIMUM_REAR_RANGE_LIMIT     10.0
+// Minimum range for steering decisions
+// below steering range the car changes direction
+#define STEERING_FORWARD_RANGE_LIMIT 50.0
+#define STEERING_REAR_RANGE_LIMIT    50.0
 
 #define DRIVE_MOTOR_DIRECTION_PIN    10
 #define STEERING_MOTOR_DIRECTION_PIN 11
@@ -32,7 +36,13 @@
 #define REAR_INNER_TURN_RADIUS_METERS  (sqrt( pow(FRONT_INNER_TURN_RADIUS_METERS,2)-pow(WHEELBASE_METERS,2) ) )
 #define REAR_OUTER_TURN_RADIUS_METERS  (REAR_INNER_TURN_RADIUS_METERS+AXEL_WIDTH_METERS)
 
-
+#define LEFT3       (-3* RADAR_SCAN_STEP_DEGREES)
+#define LEFT2       (-2* RADAR_SCAN_STEP_DEGREES)
+#define LEFT1       (-1* RADAR_SCAN_STEP_DEGREES)
+#define DEAD_AHEAD  ( 0                         )
+#define RIGHT1      ( 1* RADAR_SCAN_STEP_DEGREES)
+#define RIGHT2      ( 2* RADAR_SCAN_STEP_DEGREES)
+#define RIGHT3      ( 3* RADAR_SCAN_STEP_DEGREES)
 class Car
 {
 
