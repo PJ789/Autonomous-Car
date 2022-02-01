@@ -6,7 +6,7 @@ Car car;
 
 void setup() {
   //stdio_init_all();
-Serial.begin(250000);
+  Serial.begin(250000);
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB
   }
@@ -34,6 +34,7 @@ Serial.begin(250000);
 // Core0 loop - navigation tasks
 void loop()
 {
+  Serial.print(CLEAR);
   car.Iterator();
   //car.DumpRadarMetrics();
 }
