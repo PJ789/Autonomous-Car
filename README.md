@@ -37,12 +37,11 @@ A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where
 - If you're going to try your hand at multi-core programming... wire a push button switch to the Pico reset pin. You're going to need it. A lot.
 
 ## Some Apologies
-
-Sorry there are no circuit diagrams. Sorry about the code quality. Route planning is elementary at present, tba. And sorry about any bugs.
+Sorry about the code quality. Route planning is elementary at present, tba. And sorry about any bugs.
 
 ## Some Caveats
 
-The code is a work in progress, and offered for interest/reference only. Some elements don't work fully, some don't work at all. E&OE.
+The code is a work in progress, and for interest/reference. Some elements don't work fully, some don't work at all. E&OE.
 
 If you find it useful, please enjoy it. If you have suggestions for improvement, I'd be very interested.
 
