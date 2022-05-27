@@ -11,12 +11,12 @@
 #define HIGH_SPEED                  255
 // Minimum range before emergency stop
 // below minimum range the car stops
-#define MINIMUM_FORWARD_RANGE_LIMIT  10.0
-#define MINIMUM_REAR_RANGE_LIMIT     10.0
+#define MINIMUM_FORWARD_RANGE_LIMIT  50.0
+#define MINIMUM_REAR_RANGE_LIMIT     50.0
 // Minimum range for steering decisions
 // below steering range the car changes direction
-#define STEERING_FORWARD_RANGE_LIMIT 50.0
-#define STEERING_REAR_RANGE_LIMIT    50.0
+#define STEERING_FORWARD_RANGE_LIMIT 100.0
+#define STEERING_REAR_RANGE_LIMIT    100.0
 
 #define DRIVE_MOTOR_DIRECTION_PIN    10
 #define STEERING_MOTOR_DIRECTION_PIN 11
@@ -54,6 +54,7 @@ class Car
     void HazardLightsOn();
     void HazardLightsOff();
     void DumpRadarMetrics();
+    void PlotRadarMetrics(int);
 
   private:
   

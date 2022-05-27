@@ -8,10 +8,15 @@ Car::Car(): lights()
 
   _gpio_init(   DRIVE_MOTOR_DIRECTION_PIN);
   gpio_set_dir( DRIVE_MOTOR_DIRECTION_PIN,    GPIO_OUT);
+  gpio_put(     DRIVE_MOTOR_DIRECTION_PIN,    false );
+  
   _gpio_init(   STEERING_MOTOR_DIRECTION_PIN);
   gpio_set_dir( STEERING_MOTOR_DIRECTION_PIN, GPIO_OUT);
+  gpio_put(     STEERING_MOTOR_DIRECTION_PIN, false );
+  
   _gpio_init(   STEERING_MOTOR_SPEED_PIN);
   gpio_set_dir( STEERING_MOTOR_SPEED_PIN,     GPIO_OUT);
+  gpio_put(     STEERING_MOTOR_SPEED_PIN,     false );
 
   gpio_set_function(DRIVE_MOTOR_SPEED_PIN, GPIO_FUNC_PWM);
   // Find out which PWM slice is connected to GPIO 0 (it's slice 0)
@@ -25,11 +30,6 @@ Car::Car(): lights()
   for(int16_t r=0; r<RADAR_MEASUREMENTS; r++) radar_forward_measurements[ r]=0;
   for(int16_t f=0; f<RADAR_MEASUREMENTS; f++) radar_rearward_measurements[f]=0;
 
-  SetDriveMotorSpeed(0);
-  Drive(forward);
-  Steer(none);
-
-  printf("Testing lights\n");
   lights.Off();
   for (uint8_t i = 0; i<9; i++)
   {
@@ -60,25 +60,28 @@ void Car::Iterator()
   while (multicore_fifo_rvalid())
   {
     fifo_message = multicore_fifo_pop_blocking();
-    printf("fifo message received on core0\n");
+    Serial.println("fifo message received on core0");
     DecodeFifo( fifo_message );
   }
 
-  printf("Plan route\n");
+  Serial.println("Plan route");
   PlanRoute();
 
   if (CollisionAvoidance() )
   {
-    printf("Collision avoidance activated!\n");
+    Serial.println("Collision avoidance activated!");
     EmergencyStop();
   }
   else
   {
-    printf("Plan speed\n");
+    Serial.println("Plan speed");
     PlanSpeed();
   }
 
   SetLights();
+  PlotRadarMetrics(25);
+  delay(250);
+  //DumpRadarMetrics();
 }
 void Car::HazardLightsOn()
 {
@@ -203,15 +206,15 @@ void Car::PlanRoute()
     }
     else if (!(ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT)))
     {
-      printf("Plan Route; obstacle ahead, no obstacle behind\n");
-      printf("Plan Route; decision: steer none, drive reverse\n");
+      Serial.println("Plan Route; obstacle ahead, no obstacle behind");
+      Serial.println("Plan Route; decision: steer none, drive reverse");
       Steer(none);
       Drive(reverse);
     }
     else
     {
-      printf("Plan Route; obstacle ahead & behind\n");
-      printf("Plan Route; decision: no option to change course\n");
+      Serial.println("Plan Route; obstacle ahead & behind");
+      Serial.println("Plan Route; decision: no option to change course");
       Steer(none);
     }
   }
@@ -282,15 +285,15 @@ void Car::PlanRoute()
     }
     else if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
-      printf("Plan Route; obstacle behind, no obstacle ahead\n");
-      printf("Plan Route; decision: steer none, drive forward\n");
+      Serial.println("Plan Route; obstacle behind, no obstacle ahead");
+      Serial.println("Plan Route; decision: steer none, drive forward");
       Steer(none);
       Drive(forward);
     }
     else
     {
-      printf("Plan Route; obstacle ahead & behind\n");
-      printf("Plan Route; decision: no option to change course\n");
+      Serial.println("Plan Route; obstacle ahead & behind");
+      Serial.println("Plan Route; decision: no option to change course");
       Steer(none);
       Drive(reverse);
     }
@@ -299,25 +302,25 @@ void Car::PlanRoute()
 }
 void Car::PlanSpeed()
 {
-  printf("Plan Speed\n");
+  Serial.println("Plan Speed");
 
   if (DirectionIsForward())
   {
     if (ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
-      printf("Forward Stop\n");
+      Serial.println("Forward Stop");
       SetDriveMotorSpeed(0);
     }
     else
     {
       if (Turning())
       {
-        printf("Forward Low Speed\n");
+        Serial.println("Forward Low Speed");
         SetDriveMotorSpeed(LOW_SPEED);
       }
       else
       {
-        printf("Forward High Speed\n");
+        Serial.println("Forward High Speed");
         SetDriveMotorSpeed(HIGH_SPEED);
       }
     }
@@ -326,19 +329,19 @@ void Car::PlanSpeed()
   {
     if (ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT))
     {
-      printf("Reverse Stop\n");
+      Serial.println("Reverse Stop");
       SetDriveMotorSpeed(0);
     }
     else
     {
       if (Turning())
       {
-        printf("Reverse Low Speed\n");
+        Serial.println("Reverse Low Speed");
         SetDriveMotorSpeed(LOW_SPEED);
       }
       else
       {
-        printf("Reverse High Speed\n");
+        Serial.println("Reverse High Speed");
         SetDriveMotorSpeed(HIGH_SPEED);
       }
     }
@@ -470,20 +473,22 @@ bool Car::CollisionAvoidance()
 }
 void Car::SetDriveMotorSpeed(uint8_t s)
 {
-  printf("Set drive speed\n");
+  Serial.println("Set drive speed");
 
   if (s == last_drive_motor_speed)
   {
-    printf("No speed change\n");
+    Serial.println("No speed change");
     return;
   }
   
-  printf("Changing speed from %iu to %iu\n",
-         last_drive_motor_speed, s);
+  Serial.print("Changing speed from ");
+  Serial.print(last_drive_motor_speed);
+  Serial.print(" to ");
+  Serial.println( s);
 
   if ( s > last_drive_motor_speed )
   {
-    printf("Accelerating\n");
+    Serial.println("Accelerating");
 
     for (int i = last_drive_motor_speed; (i <= s) && !(CollisionAvoidance()); i++) {
       pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, i);
@@ -491,7 +496,7 @@ void Car::SetDriveMotorSpeed(uint8_t s)
     }
   } else if ( s < last_drive_motor_speed )
   {
-    printf("Decelerating\n");
+    Serial.println("Decelerating");
 
     for (int i = last_drive_motor_speed; (i >= s) && !(CollisionAvoidance()); i--) {
       pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, i);
@@ -501,7 +506,7 @@ void Car::SetDriveMotorSpeed(uint8_t s)
 }
 void Car::EmergencyStop()
 {
-  printf("<<< EMERGENCY STOP >>>\n");
+  Serial.println("<<< EMERGENCY STOP >>>");
 
   // Power down drive motor
   pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, 0);
@@ -515,6 +520,7 @@ void Car::EmergencyStop()
   Drive(forward);
   SetDriveMotorSpeed(0);
   Steer(none);
+  SendStatus();
   
   Serial.println("8888888888 888b     d888 8888888888 8888888b.   .d8888b.  8888888888 888b    888  .d8888b. Y88b   d88P");
   Serial.println("888        8888b   d8888 888        888   Y88b d88P  Y88b 888        8888b   888 d88P  Y88b Y88b d88P");
@@ -543,28 +549,28 @@ void Car::Drive( drive_motor_direction direction )
     case forward:
       if (!DirectionIsForward())
       {
-        printf("Changing direction to forward\n");
+        Serial.println("Changing direction to forward");
 
         // Slow to a stop
         SetDriveMotorSpeed( 0 );
         gpio_put(DRIVE_MOTOR_DIRECTION_PIN, false );
       } else
       {
-        printf("Maintaining forward direction\n");
+        Serial.println("Maintaining forward direction");
       }
       last_drive_motor_direction = forward;
       break;
     case reverse:
       if (!DirectionIsReverse())
       {
-        printf("Changing direction to reverse\n");
+        Serial.println("Changing direction to reverse");
 
         // Slow to a stop
         SetDriveMotorSpeed( 0 );
         gpio_put(DRIVE_MOTOR_DIRECTION_PIN, true );
       } else
       {
-        printf("Maintaining reverse direction\n");
+        Serial.println("Maintaining reverse direction");
       }
       last_drive_motor_direction = reverse;
       break;
@@ -577,21 +583,21 @@ void Car::Steer( steering_motor_direction direction )
   switch (direction) {
     case left:
       last_steering_motor_direction = left;
-      printf("Steering left\n");
+      Serial.println("Steering left");
 
       gpio_put(STEERING_MOTOR_DIRECTION_PIN, true );
       gpio_put(STEERING_MOTOR_SPEED_PIN, true );
       break;
     case right:
       last_steering_motor_direction = right;
-      printf("Steering to right\n");
+      Serial.println("Steering to right");
 
       gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
       gpio_put(STEERING_MOTOR_SPEED_PIN, true );
       break;
     default:
       last_steering_motor_direction = none;
-      printf("Steering cancel\n");
+      Serial.println("Steering cancel");
 
       gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
       gpio_put(STEERING_MOTOR_SPEED_PIN, false );
@@ -627,6 +633,7 @@ void Car::DecodeFifo(uint32_t fifo_message)
 
   if (fifo_message == RADAR_READY_FIFO_MESSAGE)
   {
+    Serial.println("Radar ready");
     SendStatus();
     return;
   }
@@ -638,20 +645,26 @@ void Car::DecodeFifo(uint32_t fifo_message)
   switch (decoded_message[0])
   {
     case 'R': // radar measurement
+      Serial.print("Radar  measurement ");
       angle = ((fifo_message & 0x0000FF00) >> 8);
       range = (fifo_message & 0x000000FF);
       index = (angle / RADAR_MEASUREMENTS_GRANULARITY);
       switch (decoded_message[1])
       {
         case 'F': // forward
+          Serial.print("forward ");
           radar_forward_measurements[index] = range;
           break;
         case 'R': // rearward
+          Serial.print("rearward ");
           radar_rearward_measurements[index] = range;
           break;
         default:
           break;
       }
+      Serial.print(angle);
+      Serial.print(" degs, range ");
+      Serial.println(range);
       break;
     default:
       break;
@@ -714,4 +727,74 @@ void Car::DumpRadarMetrics()
   }
     Serial.println("........................................................................................");
   
+}
+void Car::PlotRadarMetrics(int d)
+{
+  float o,a,h,ft,rt,m,s;
+  int i,r, starty, endy;
+  r = round( d/2 );
+  s = 255/((float) r);
+
+  starty = (Stopped()||DirectionIsForward())?r:0;
+  endy   = (Stopped()||DirectionIsReverse())?-r:0;
+
+  for (int y=starty; y>=endy; y--)
+  {
+    for (int x=-r; x<=r; x++)
+    {
+      a = x*s;
+      o = abs(y*s);
+      h = sqrt(pow(a,2)+pow(o,2));
+      rt = 180 - (atan2(o,a)*57.295779513);
+      ft = (atan2(o,a)*57.295779513);
+
+      if (y>0)
+      {
+        i = round (ft / RADAR_MEASUREMENTS_GRANULARITY);
+        m = radar_forward_measurements[i];
+      }
+      else
+      {
+        i = round (rt / RADAR_MEASUREMENTS_GRANULARITY);
+        m = radar_rearward_measurements[i];
+      }
+
+      if (y==0)
+      {
+        Serial.print( (x==0)? "+":"-");
+      }
+      else if (x==0)
+      {
+        if (h<m)
+        {
+          Serial.print("#");
+        }
+        else
+        {
+          Serial.print( "|");
+        }
+      }
+      else if (h<m)
+      {
+        Serial.print("#");
+      }
+      else if ((h/255)>1)
+      {
+        Serial.print(" ");
+      }
+      else
+      {
+        if(h<STEERING_FORWARD_RANGE_LIMIT)
+        {
+          Serial.print((h<MINIMUM_FORWARD_RANGE_LIMIT)?".":"¤");
+        }
+        else
+        {
+          Serial.print(".");
+        }
+      }
+    }      
+    Serial.println();   
+  }
+ 
 }
