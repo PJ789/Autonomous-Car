@@ -30,6 +30,7 @@ float Ultrasound::Measure()
 
   // Read echo time
   echo_duration = Ultrasound::ultrasound_pulse_duration;
+  if (!echo_duration) echo_duration=ULTRASOUND_ECHO_TIMEOUT_MICROS;
   
   // Speed of ultrasound 350m/s (0.035cm/us)
   distance = echo_duration * 0.035 / 2.0; 

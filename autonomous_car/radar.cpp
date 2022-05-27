@@ -26,7 +26,6 @@ void Radar::Iterator()
   while (multicore_fifo_rvalid())
   {
     fifo_message = multicore_fifo_pop_blocking();
-    printf("fifo message received on core1\n");
     DecodeFifo( fifo_message );
   }
 
@@ -51,7 +50,27 @@ void Radar::TurretRotationSequencer()
    // use pico api to avoid core crashing on millis
   time_millis=time_us_64()/1000;
 
-  if ( Turning() )
+  if ( Moving() && !Turning() )
+  {
+    // base interval, plus 1* ultrasound measurements plus rotation time
+    rotation_interval_ms = 100 +(ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
+    rotation_steps       = 4;
+    radar_sequence = ( time_millis /rotation_interval_ms ) % rotation_steps;
+
+    switch(radar_sequence) {
+      case 0:
+        target_radar_turret_angle = (  1 * RADAR_SCAN_STEP_DEGREES );
+        break;
+      case 1:
+      case 3:
+        target_radar_turret_angle = (  0 );
+        break;
+      case 2:
+        target_radar_turret_angle = ( -1 * RADAR_SCAN_STEP_DEGREES );
+        break;
+    }
+  }
+  if ( Moving() && Turning() )
   {
     // base interval, plus 1* ultrasound measurements plus rotation time
     rotation_interval_ms = 100 +(ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
@@ -79,7 +98,7 @@ void Radar::TurretRotationSequencer()
           break;
       }
     }
-    else
+    else // MovingForward && TurningRight || Moving Backward && TurningLeft
     {
       switch(radar_sequence) {
         case 0:
@@ -97,27 +116,7 @@ void Radar::TurretRotationSequencer()
       }
     }
   }
-  else if (Moving())
-  {
-    // base interval, plus 1* ultrasound measurements plus rotation time
-    rotation_interval_ms = 100 +(ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
-    rotation_steps       = 4;
-    radar_sequence = ( time_millis /rotation_interval_ms ) % rotation_steps;
-
-    switch(radar_sequence) {
-      case 0:
-        target_radar_turret_angle = (  1 * RADAR_SCAN_STEP_DEGREES );
-        break;
-      case 1:
-      case 3:
-        target_radar_turret_angle = (  0 );
-        break;
-      case 2:
-        target_radar_turret_angle = ( -1 * RADAR_SCAN_STEP_DEGREES );
-        break;
-    }
-  }
-  else //if (Stopped())
+  if ( Stopped() )
   {
     // base interval, plus 2* ultrasound measurements plus rotation time
     rotation_interval_ms = 100 +(2*ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
@@ -166,14 +165,15 @@ void Radar::TurretRotationSequencer()
   if (target_radar_turret_angle != GetTurretDirection() )
   {
     RotateTurret(target_radar_turret_angle);
-    if ( MovingForward() || Stopped() )
-    {
-      MeasureFront();
-    }
-    if  ( MovingBackward() || Stopped() )
-    {
-      MeasureRear();
-    }
+  }
+
+  if ( MovingForward()  || Stopped() )
+  {
+    MeasureFront();
+  }
+  if ( MovingBackward() || Stopped() )
+  {
+    MeasureRear();
   }
   
 }
