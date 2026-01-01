@@ -21,18 +21,20 @@ The code provides examples of;
 
 The 'radar' turret is [based on this 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back HC-SR04 ultrasound sensors. The ultrasound turret sits ontop of a [DOMAN S0090MD metal gear 9g digital servo](http://www.domanrchobby.com/content/?130.html).
 
-The car has two custom circuits, each with an IRLZ44N MOSFET switching a mechanical DPST relay. The relays control forward/backward and left/right DC motor direction (by reversing the polarity of the power to the DC motors). Each circuit has a second MOSFET, used to provide power on/off and PWM speed control.
+The car has two custom ESC (electronic speed control) circuits, each with an IRLZ44N MOSFET switching a mechanical DPST relay. The two relays control forward/backward and left/right DC motor direction (by reversing the polarity of the power to the DC motors). Each circuit has a second MOSFET, used to provide PWM speed control over the motors.
 
 A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where necessary, to boost the 3.3V Pico GPIO pins up to 5V.
 
+A buck convertor is used to supply the steering motor with 5v power, from a 7.2v NiMH battery pack used for the main motor. The digital circuit is powered from a large 5v USB powerback.
+
 ## Some Pico Programming Notes
 
-- This code compiles under the Arduino IDE, but mostly uses the Pico SDK. This creates some awkward problems; particularly the Pico SDK 'printf' function doesn't work on Core1. I'm still trying to find a workaround.
+- This code compiles under the Arduino IDE, but also uses the Pico SDK. This creates some awkward problems; particularly because the Pico SDK 'printf' function doesn't work on Core1, and various time related functions are unstable on core1.
 - Pico PWM settings affect multiple pins in a group. If you use PWM, it seems you should avoid using other pins in the same group, else you can experience strange side-effects. [See also these useful notes; 'making sure not to use two GPIO pins having the same number and letter designation together'](https://www.etechnophiles.com/raspberry-pi-pico-pinout-specifications-datasheet-in-detail/)
-- Core1 seems very sensitive to low power conditions; you need a robust 5V power supply, or else Core1 will stop functioning. Adding capacitors to the power supply helps. Devices like servos can draw huge amounts of current.
+- Core1 seems very sensitive to low power conditions; you need a robust 5V power supply, or else Core1 will stop functioning. Adding capacitors to the power supply helps. Keep DC motors and digital electronics on different opto-isolated circuits.
 - To avoid concurrency problems when writing multi-core code, avoid using any Arduino or mbed APIs, particularly on Core1, and particularly so Serial.print or Arduino timer related functions. The Arduino/mbed APIS are apparently not designed for multi-core MCUs, and thus using them on Core1 will crash the Pico... leading to flashing LED error codes and requiring a complete reset. 
 - To avoid concurrency problems, I also avoided creating heap objects on Core1 (so relying on the Core1 stack almost exclusively, which is not shared with Core0)
-- The default stack size on both cores seems quite small, especially if you are using C++ object oriented code libraries, and also using the stack to avoid creating heap objects (see above). So I increased my stack sizes to the limit by setting compiler flags (-DPICO_STACK_SIZE=0x1000 -DPICO_CORE1_STACK_SIZE=0x1000)
+- The default stack size on both cores seems quite small, especially if you are using C++ object oriented code libraries, and also using the stack to avoid creating heap objects (see above). So I increased my stack sizes to the limit by setting compiler flags (-DPICO_STACK_SIZE=0x1000 -DPICO_CORE1_STACK_SIZE=0x1000), also set a custom stack size for code running on core1 in code.
 - To calculate the PWM frequency for a servo, you take the system clock (default 125mhz), divide it by the maximum PWM counter value (default 65535) to arrive at the current PWM frequency. Then pick a clock divider to align with your servo PWM frequency needs. Take a look at the [servo code](https:autonomous_car/servo.cpp) for an example of how this works.
 - If you're going to try your hand at multi-core programming... wire a push button switch to the Pico reset pin. You're going to need it. A lot.
 
@@ -43,18 +45,19 @@ Sorry about the code quality. Route planning is elementary at present, tba. And 
 
 I've worked on this project for a few years, on and off. Now its working, I can offer some suggestions to greatly simplify your life;-
 
-- Use an ESC (electronic speed controller) to control your main drive motor. They're cheap, simple to interface using PWM, and avoid lots of the complications of building your own motor control circuits (voltage spikes & so forth particularly). I wish I'd done that.
+- Use an off the shelf ESC (electronic speed controller) to control your main drive motor. They're cheap, simple to interface using PWM, and avoid lots of the complications of building your own motor control circuits (voltage spikes & so forth particularly). I wish I'd done that.
 - Use a servo to control steering. If your RC car donor doesn't have a servo for steering (mine has a DC motor), you should make it so. I will do that at some point. Controlling a servo is a lot easier than trying to control a DC motor, and gives you much better control. I wish I'd done that.
 - Use a LIDAR module, not ultrasound. They're ten times more expensive, but ultrasound is simply too slow for a fast car. You need fast accurate sensing to travel at speed, and scanning ultrasound is simply not fast enough to make it reliable.
-- Use a buck convertor module to bring down the battery voltage to 5v, not a voltage regulator. You need a solid power source.
-- Use a separate battery for the digital electronics, one that outlasts the main battery. You don't want the control circuit to expire before the motors (because that creates an unguided missile).
-- Use fresh rechargable batteries. Old NiMH batteries are junk, the internal resistant is terrible.. I found that out the hard way, so you don't have to.
-- Use opto-couplers to separate the main/steering motors from the digital electronics entirely. It makes a big different, the Pico seems quite vulnerable to voltage spikes.
+- Use a buck convertor module to bring down the battery voltage to 5v, not a voltage regulator. You need a solid power source with lots of amps.
+- Use a separate battery for the digital electronics, one that outlasts the main battery. You don't want the control circuit to expire before the motors (because that creates an unguided missile). USB powerbanks are good for the job.
+- Use fresh rechargable batteries. Old NiMH batteries are junk, the internal resistance is terrible.. I found that out the hard way, so you don't have to.
+- Use opto-couplers to separate the main/steering motors from the digital electronics entirely. It makes a big difference to the stability of your system, the Pico seems quite vulnerable to voltage spikes.
 - Twist all your power leads, to reduce electro-magnetic interference. The Pico seems vulnerable to EMI, crashing in strange and unpredictable ways.
+- Pay careful attention to interrupt handling code on core1 (used for ultrasound). It is hard enough on core0, but on core1 even more so because you have no way to add debug.
 
 ## Some Caveats
 
-The code is a work in progress, and for interest/reference. Mostly, its work fully. E&OE.
+The code is a work in progress, and for interest/reference. Mostly, it's working fully now. E&OE.
 
 If you find it useful, please enjoy it. If you have suggestions for improvement, I'd be very interested.
 
