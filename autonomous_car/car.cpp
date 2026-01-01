@@ -1,34 +1,46 @@
 #include "car.h"
+#include "debug.h"
 
 Car::Car(): lights()
 {
+
   absolute_time_t timeout;
-  acceleration = 1;
-  deceleration = 1;
 
   _gpio_init(   DRIVE_MOTOR_DIRECTION_PIN);
   gpio_set_dir( DRIVE_MOTOR_DIRECTION_PIN,    GPIO_OUT);
-  gpio_put(     DRIVE_MOTOR_DIRECTION_PIN,    false );
-  
   _gpio_init(   STEERING_MOTOR_DIRECTION_PIN);
   gpio_set_dir( STEERING_MOTOR_DIRECTION_PIN, GPIO_OUT);
-  gpio_put(     STEERING_MOTOR_DIRECTION_PIN, false );
-  
-  _gpio_init(   STEERING_MOTOR_SPEED_PIN);
-  gpio_set_dir( STEERING_MOTOR_SPEED_PIN,     GPIO_OUT);
-  gpio_put(     STEERING_MOTOR_SPEED_PIN,     false );
 
   gpio_set_function(DRIVE_MOTOR_SPEED_PIN, GPIO_FUNC_PWM);
-  // Find out which PWM slice is connected to GPIO 0 (it's slice 0)
-  uint16_t slice_num = pwm_gpio_to_slice_num(DRIVE_MOTOR_SPEED_PIN);
-  pwm_set_wrap(slice_num, 255);
+  // Find out which PWM slice is connected to pin
+  uint16_t drive_motor_slice_num = pwm_gpio_to_slice_num(DRIVE_MOTOR_SPEED_PIN);
+  // System clock is 125 MHz by default
+  // For 20 kHz, period = 125e6 / 20e3 = 6250 counts
+  pwm_set_wrap(drive_motor_slice_num, 6249);
+  //  pwm_set_wrap(slice_num, 255);
   pwm_set_gpio_level (DRIVE_MOTOR_SPEED_PIN, 0 );
   // Set the PWM running
-  pwm_set_enabled(slice_num, true);
-    
+  pwm_set_enabled(drive_motor_slice_num, true);
+
+  gpio_set_function(STEERING_MOTOR_SPEED_PIN, GPIO_FUNC_PWM);
+  // Find out which PWM slice is connected to pin
+  uint16_t steering_motor_slice_num = pwm_gpio_to_slice_num(STEERING_MOTOR_SPEED_PIN);
+  // System clock is 125 MHz by default
+  // For 20 kHz, period = 125e6 / 20e3 = 6250 counts
+  pwm_set_wrap(steering_motor_slice_num, 6249);
+  //  pwm_set_wrap(slice_num, 255);
+  pwm_set_gpio_level (STEERING_MOTOR_SPEED_PIN, 0 );
+  // Set the PWM running
+  pwm_set_enabled(steering_motor_slice_num, true);
+
+  HardStop();
+ 
   // initialise radar measurements
-  for(int16_t r=0; r<RADAR_MEASUREMENTS; r++) radar_forward_measurements[ r]=0;
-  for(int16_t f=0; f<RADAR_MEASUREMENTS; f++) radar_rearward_measurements[f]=0;
+  for(int16_t r=0; r<RADAR_MEASUREMENTS; r++)
+  {
+    radar_forward_measurements[ r]=0;
+    radar_rearward_measurements[r]=0;
+  }
 
   lights.Off();
   for (uint8_t i = 0; i<9; i++)
@@ -53,36 +65,107 @@ Car::Car(): lights()
   }
 
 }
+
 void Car::Iterator()
 {
+  // simple motor test
+//  SetDriveMotorSpeed(DRIVE_MOTOR_HIGH_SPEED);
+  // long m = millis(); 
+  //  if ((m & 0x1FFF) > 0x0FFF)
+  //  {
+  //   SERIALPRINTLN("Left");
+  //    this->Steer(left);
+  //   }
+  //  else
+  //  {
+  //   SERIALPRINTLN("Right");
+  //    this->Steer(right);
+  //  }
+  //  return;
+
   uint32_t fifo_message;
+  static uint     fifo_message_count = 0;
 
   while (multicore_fifo_rvalid())
   {
-    fifo_message = multicore_fifo_pop_blocking();
-    Serial.println("fifo message received on core0");
-    DecodeFifo( fifo_message );
+    if(multicore_fifo_pop_timeout_us(100, &fifo_message))
+    {
+      SERIALPRINTLN("fifo message received on core0");
+      DecodeFifo( fifo_message );
+      fifo_message_count+=1;
+      //PlotRadarMetrics(25);// nb slow
+      //DumpRadarMetrics();        
+    }
+    else
+    {
+      SERIALPRINTLN("Nothing to receive");
+      sleep_ms(250);        
+    }
+
   }
 
-  Serial.println("Plan route");
+  if (fifo_message_count < 100)
+  {
+      SERIALPRINTLN("Initializing radar data, no movement");
+      SERIALPRINT(fifo_message_count);
+      SERIALPRINTLN("% complete");
+      PlotRadarMetrics(25);// nb slow
+      SetLights();
+      return;
+  }
+  fifo_message_count = 100;
+
   PlanRoute();
 
   if (CollisionAvoidance() )
   {
-    Serial.println("Collision avoidance activated!");
+    SERIALPRINTLN("Collision avoidance activated!");
     EmergencyStop();
   }
   else
   {
-    Serial.println("Plan speed");
+    SERIALPRINTLN("No collision risk detected");
     PlanSpeed();
   }
 
   SetLights();
-  PlotRadarMetrics(25);
-  delay(250);
-  //DumpRadarMetrics();
+
 }
+void Car::DriveMotorSpeedControlCallback()
+{
+  if (current_drive_motor_speed < target_drive_motor_speed)
+  {
+    current_drive_motor_speed += DRIVE_MOTOR_ACCELERATION;
+    current_drive_motor_speed = (current_drive_motor_speed>target_drive_motor_speed)?target_drive_motor_speed:current_drive_motor_speed;
+  }
+  else
+  if (current_drive_motor_speed > target_drive_motor_speed)
+  {
+    current_drive_motor_speed -= min(current_drive_motor_speed, DRIVE_MOTOR_DECELERATION);
+  }
+  pwm_set_gpio_level (DRIVE_MOTOR_SPEED_PIN, current_drive_motor_speed );
+}
+
+void Car::SteeringMotorSpeedControlCallback()
+{
+  if (current_steering_motor_speed < target_steering_motor_speed)
+  {
+    current_steering_motor_speed += STEERING_MOTOR_ACCELERATION;
+    current_steering_motor_speed = (current_steering_motor_speed>target_steering_motor_speed)?target_steering_motor_speed:current_steering_motor_speed;
+  }
+  else
+  if (current_steering_motor_speed > target_steering_motor_speed)
+  {
+    current_steering_motor_speed -= min(current_steering_motor_speed, STEERING_MOTOR_DECELERATION);
+  }
+  pwm_set_gpio_level(STEERING_MOTOR_SPEED_PIN, current_steering_motor_speed);
+  SERIALPRINT("Setting PWM GPIO LEVEL ON PIN ");
+  SERIALPRINT(STEERING_MOTOR_SPEED_PIN);
+  SERIALPRINT(" TO ");
+  SERIALPRINTLN(current_steering_motor_speed);
+}
+
+
 void Car::HazardLightsOn()
 {
     lights.Flash();
@@ -93,7 +176,7 @@ void Car::HazardLightsOff()
 }
 void Car::SetLights()
 {
-  if (Stopped())
+  if (DriveMotorStopped())
   {
     HazardLightsOn();
     return;
@@ -138,13 +221,13 @@ void Car::SetLights()
 }
 void Car::PlanRoute()
 {
-  Serial.println("Plan Route\n");
+  SERIALPRINTLN("Plan Route\n");
   if (DirectionIsForward())
   {
-    Serial.println("Plan Route; current direction is forward\n");
+    SERIALPRINTLN("Plan Route; current direction is forward\n");
     if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
-      Serial.println("Plan Route; no obstacle ahead\n");
+      SERIALPRINTLN("Plan Route; no obstacle ahead\n");
       if (Turning())
       {
         if (TurningLeft())
@@ -155,13 +238,13 @@ void Car::PlanRoute()
               (GetRadarForwardMeasurements(LEFT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
              )
           {
-            Serial.println("Plan Route; decision: steer left->left, drive forward\n");
+            SERIALPRINTLN("Plan Route; decision: steer left->left, drive forward\n");
             Steer(left);
           }
           else
           {
-            Serial.println("Plan Route; decision: steer left->none, drive forward\n");
-            Steer(none);
+            SERIALPRINTLN("Plan Route; decision: steer left->none, drive forward\n");
+            Steer(none); 
           }
         } else
         if (TurningRight())
@@ -172,12 +255,12 @@ void Car::PlanRoute()
               (GetRadarForwardMeasurements(RIGHT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
              )
           {
-            Serial.println("Plan Route; decision: steer right->right, drive forward\n");
+            SERIALPRINTLN("Plan Route; decision: steer right->right, drive forward\n");
             Steer(right);
           }
           else
           {
-            Serial.println("Plan Route; decision: steer right->none, drive forward\n");
+            SERIALPRINTLN("Plan Route; decision: steer right->none, drive forward\n");
             Steer(none);
           }
         }
@@ -190,7 +273,7 @@ void Car::PlanRoute()
             (GetRadarForwardMeasurements(LEFT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
            )
         {
-          Serial.println("Plan Route; decision: steer none->right, drive forward\n");
+          SERIALPRINTLN("Plan Route; decision: steer none->right, drive forward\n");
           Steer(right);
         } else
         if (
@@ -199,31 +282,31 @@ void Car::PlanRoute()
             (GetRadarForwardMeasurements(DEAD_AHEAD)+GetRadarForwardMeasurements(RIGHT1))
            )
         {
-          Serial.println("Plan Route; decision: steer none->left, drive forward\n");
+          SERIALPRINTLN("Plan Route; decision: steer none->left, drive forward\n");
           Steer(left);
         }
       }
     }
     else if (!(ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT)))
     {
-      Serial.println("Plan Route; obstacle ahead, no obstacle behind");
-      Serial.println("Plan Route; decision: steer none, drive reverse");
+      SERIALPRINTLN("Plan Route; obstacle ahead, no obstacle behind");
+      SERIALPRINTLN("Plan Route; decision: steer none, drive reverse");
       Steer(none);
       Drive(reverse);
     }
     else
     {
-      Serial.println("Plan Route; obstacle ahead & behind");
-      Serial.println("Plan Route; decision: no option to change course");
+      SERIALPRINTLN("Plan Route; obstacle ahead & behind");
+      SERIALPRINTLN("Plan Route; decision: no option to change course");
       Steer(none);
     }
   }
   else if (DirectionIsReverse())
   {
-    Serial.println("Plan Route; current direction is reverse\n");
+    SERIALPRINTLN("Plan Route; current direction is reverse\n");
     if (!ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT))
     {
-      Serial.println("Plan Route; no obstacle behind\n");
+      SERIALPRINTLN("Plan Route; no obstacle behind\n");
       if (Turning())
       {
         if (TurningLeft()) // nb right in reverse
@@ -234,12 +317,12 @@ void Car::PlanRoute()
               (GetRadarRearwardMeasurements(RIGHT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
              )
           {
-            Serial.println("Plan Route; decision: steer left->left, drive reverse\n");
+            SERIALPRINTLN("Plan Route; decision: steer left->left, drive reverse\n");
             Steer(left);
           }
           else
           {
-            Serial.println("Plan Route; decision: steer left->none, drive reverse\n");
+            SERIALPRINTLN("Plan Route; decision: steer left->none, drive reverse\n");
             Steer(none);
           }
         } else
@@ -251,12 +334,12 @@ void Car::PlanRoute()
               (GetRadarRearwardMeasurements(LEFT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
              )
           {
-            Serial.println("Plan Route; decision: steer right->right, drive reverse\n");
+            SERIALPRINTLN("Plan Route; decision: steer right->right, drive reverse\n");
             Steer(right);
           }
           else
           {
-            Serial.println("Plan Route; decision: steer right->none, drive reverse\n");
+            SERIALPRINTLN("Plan Route; decision: steer right->none, drive reverse\n");
             Steer(none);
           }
         }
@@ -269,7 +352,7 @@ void Car::PlanRoute()
             (GetRadarRearwardMeasurements(LEFT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
            )
         {
-          Serial.println("Plan Route; decision: steer none->left, drive reverse\n");
+          SERIALPRINTLN("Plan Route; decision: steer none->left, drive reverse\n");
           Steer(left);
         } else
         if (
@@ -278,22 +361,22 @@ void Car::PlanRoute()
             (GetRadarRearwardMeasurements(DEAD_AHEAD)+GetRadarRearwardMeasurements(RIGHT1))
            )
         {
-          Serial.println("Plan Route; decision: steer none->right, drive reverse\n");
+          SERIALPRINTLN("Plan Route; decision: steer none->right, drive reverse\n");
           Steer(right);
         }
       }
     }
     else if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
-      Serial.println("Plan Route; obstacle behind, no obstacle ahead");
-      Serial.println("Plan Route; decision: steer none, drive forward");
+      SERIALPRINTLN("Plan Route; obstacle behind, no obstacle ahead");
+      SERIALPRINTLN("Plan Route; decision: steer none, drive forward");
       Steer(none);
       Drive(forward);
     }
     else
     {
-      Serial.println("Plan Route; obstacle ahead & behind");
-      Serial.println("Plan Route; decision: no option to change course");
+      SERIALPRINTLN("Plan Route; obstacle ahead & behind");
+      SERIALPRINTLN("Plan Route; decision: no option to change course");
       Steer(none);
       Drive(reverse);
     }
@@ -302,26 +385,26 @@ void Car::PlanRoute()
 }
 void Car::PlanSpeed()
 {
-  Serial.println("Plan Speed");
+  SERIALPRINTLN("Plan Speed");
 
   if (DirectionIsForward())
   {
     if (ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
-      Serial.println("Forward Stop");
+      SERIALPRINTLN("Forward Stop");
       SetDriveMotorSpeed(0);
     }
     else
     {
       if (Turning())
       {
-        Serial.println("Forward Low Speed");
-        SetDriveMotorSpeed(LOW_SPEED);
+        SERIALPRINTLN("Forward Low Speed");
+        SetDriveMotorSpeed(DRIVE_MOTOR_LOW_SPEED);
       }
       else
       {
-        Serial.println("Forward High Speed");
-        SetDriveMotorSpeed(HIGH_SPEED);
+        SERIALPRINTLN("Forward High Speed");
+        SetDriveMotorSpeed(DRIVE_MOTOR_HIGH_SPEED);
       }
     }
   }
@@ -329,27 +412,31 @@ void Car::PlanSpeed()
   {
     if (ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT))
     {
-      Serial.println("Reverse Stop");
+      SERIALPRINTLN("Reverse Stop");
       SetDriveMotorSpeed(0);
     }
     else
     {
       if (Turning())
       {
-        Serial.println("Reverse Low Speed");
-        SetDriveMotorSpeed(LOW_SPEED);
+        SERIALPRINTLN("Reverse Low Speed");
+        SetDriveMotorSpeed(DRIVE_MOTOR_LOW_SPEED);
       }
       else
       {
-        Serial.println("Reverse High Speed");
-        SetDriveMotorSpeed(HIGH_SPEED);
+        SERIALPRINTLN("Reverse High Speed");
+        SetDriveMotorSpeed(DRIVE_MOTOR_HIGH_SPEED);
       }
     }
   }
 }
-bool Car::Stopped()
+bool Car::DriveMotorStopped()
 {
-  return (last_drive_motor_speed == 0);
+  return (current_drive_motor_speed == 0);
+}
+bool Car::SteeringMotorStopped()
+{
+  return (current_steering_motor_speed == 0);
 }
 bool Car::Moving()
 {
@@ -357,31 +444,31 @@ bool Car::Moving()
 }
 bool Car::MovingForward()
 {
-  return ( (last_drive_motor_direction == forward ) && (last_drive_motor_speed > 0) );
+  return ( (current_drive_motor_direction == forward ) && (current_drive_motor_speed > 0) );
 }
 bool Car::MovingBackward()
 {
-  return ( (last_drive_motor_direction == reverse ) && (last_drive_motor_speed > 0) );
+  return ( (current_drive_motor_direction == reverse ) && (current_drive_motor_speed > 0) );
 }
 bool Car::DirectionIsForward()
 {
-  return (last_drive_motor_direction == forward);
+  return (current_drive_motor_direction == forward);
 }
 bool Car::DirectionIsReverse()
 {
-  return (last_drive_motor_direction == reverse);
+  return (current_drive_motor_direction == reverse);
 }
 bool Car::Turning()
 {
-  return ( last_steering_motor_direction != none );
+  return ( current_steering_motor_direction != none );
 }
 bool Car::TurningLeft()
 {
-  return ( last_steering_motor_direction == left );
+  return ( current_steering_motor_direction == left );
 }
 bool Car::TurningRight()
 {
-  return ( last_steering_motor_direction == right );
+  return ( current_steering_motor_direction == right );
 }
 bool Car::ObstacleDetectedAhead(float range_limit)
 {
@@ -406,12 +493,12 @@ bool Car::ObstacleDetectedAhead(float range_limit)
     range = GetRadarForwardMeasurements(i * RADAR_SCAN_STEP_DEGREES);
     if (range < range_limit)
     {
-      Serial.print("Obstacle ahead. Range ");
-      Serial.print(range);
-      Serial.print(" cm (min ");
-      Serial.print(range_limit);
-      Serial.print(" cm) @angle=");
-      Serial.println(i * RADAR_SCAN_STEP_DEGREES);
+      SERIALPRINT("Obstacle ahead. Range ");
+      SERIALPRINT(range);
+      SERIALPRINT(" cm (min ");
+      SERIALPRINT(range_limit);
+      SERIALPRINT(" cm) @angle=");
+      SERIALPRINTLN(i * RADAR_SCAN_STEP_DEGREES);
       obstacle_detected = true;
     }
 
@@ -441,12 +528,12 @@ bool Car::ObstacleDetectedBehind(float range_limit)
     range = GetRadarRearwardMeasurements(i * RADAR_SCAN_STEP_DEGREES);
     if (range < range_limit)
     {
-      Serial.print("Obstacle behind. Range ");
-      Serial.print(range);
-      Serial.print(" cm (min ");
-      Serial.print(range_limit);
-      Serial.print(" cm) @angle=");
-      Serial.println(i * RADAR_SCAN_STEP_DEGREES);
+      SERIALPRINT("Obstacle behind. Range ");
+      SERIALPRINT(range);
+      SERIALPRINT(" cm (min ");
+      SERIALPRINT(range_limit);
+      SERIALPRINT(" cm) @angle=");
+      SERIALPRINTLN(i * RADAR_SCAN_STEP_DEGREES);
 
       obstacle_detected = true;
     }
@@ -458,11 +545,11 @@ bool Car::CollisionAvoidance()
 {
   if (DirectionIsForward() && ObstacleDetectedAhead(MINIMUM_FORWARD_RANGE_LIMIT))
   {
-    Serial.println("Vehicle direction is forward, but obstacle too close to front of vehicle!");
+    SERIALPRINTLN("Vehicle direction is forward, but obstacle too close to front of vehicle!");
   }
   else if (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE_LIMIT))
   {
-    Serial.println("Vehicle direction is reverse, but obstacle too close to rear of vehicle!");
+    SERIALPRINTLN("Vehicle direction is reverse, but obstacle too close to rear of vehicle!");
   }
 
   return (
@@ -471,76 +558,88 @@ bool Car::CollisionAvoidance()
            (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE_LIMIT))
          );
 }
-void Car::SetDriveMotorSpeed(uint8_t s)
+void Car::SetDriveMotorSpeed(uint16_t s)
 {
-  Serial.println("Set drive speed");
-
-  if (s == last_drive_motor_speed)
+  if (s != current_drive_motor_speed)
   {
-    Serial.println("No speed change");
-    return;
+    SERIALPRINT("Changing drive motor speed from ");
+    SERIALPRINT(current_drive_motor_speed);
+    SERIALPRINT(" to ");
+    SERIALPRINTLN( s);
+
+    target_drive_motor_speed = s;
   }
-  
-  Serial.print("Changing speed from ");
-  Serial.print(last_drive_motor_speed);
-  Serial.print(" to ");
-  Serial.println( s);
-
-  if ( s > last_drive_motor_speed )
+  else
   {
-    Serial.println("Accelerating");
-
-    for (int i = last_drive_motor_speed; (i <= s) && !(CollisionAvoidance()); i++) {
-      pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, i);
-      last_drive_motor_speed = i;
-    }
-  } else if ( s < last_drive_motor_speed )
-  {
-    Serial.println("Decelerating");
-
-    for (int i = last_drive_motor_speed; (i >= s) && !(CollisionAvoidance()); i--) {
-      pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, i);
-      last_drive_motor_speed = i;
-    }
+    SERIALPRINT("Drive motor speed at ");
+    SERIALPRINTLN(current_drive_motor_speed);    
   }
 }
-void Car::EmergencyStop()
+void Car::SetSteeringMotorSpeed(uint16_t s)
 {
-  Serial.println("<<< EMERGENCY STOP >>>");
+  if (s != current_steering_motor_speed)
+  {
+    SERIALPRINT("Changing steering motor speed from ");
+    SERIALPRINT(current_steering_motor_speed);
+    SERIALPRINT(" to ");
+    SERIALPRINTLN( s);
 
+    target_steering_motor_speed = s;
+  }
+  else
+  {
+    SERIALPRINT("Steering motor speed at ");
+    SERIALPRINTLN(current_steering_motor_speed);    
+    SERIALPRINT("Target steering motor speed at ");
+    SERIALPRINTLN(target_steering_motor_speed);
+  }
+}
+void Car::HardStop()
+{
   // Power down drive motor
   pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, 0);
   // Power down steering motor
-  gpio_put(STEERING_MOTOR_SPEED_PIN, false );
+  pwm_set_gpio_level(STEERING_MOTOR_SPEED_PIN, 0);
+
   // Power down steering relay
   gpio_put(DRIVE_MOTOR_DIRECTION_PIN, false );
   // Power down steering motor
   gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
 
-  Drive(forward);
-  SetDriveMotorSpeed(0);
-  Steer(none);
-  SendStatus();
-  
-  Serial.println("8888888888 888b     d888 8888888888 8888888b.   .d8888b.  8888888888 888b    888  .d8888b. Y88b   d88P");
-  Serial.println("888        8888b   d8888 888        888   Y88b d88P  Y88b 888        8888b   888 d88P  Y88b Y88b d88P");
-  Serial.println("888        88888b.d88888 888        888    888 888    888 888        88888b  888 888    888  Y88o88P");
-  Serial.println("8888888    888Y88888P888 8888888    888   d88P 888        8888888    888Y88b 888 888          Y888P");
-  Serial.println("888        888 Y888P 888 888        8888888P'  888  88888 888        888 Y88b888 888           888");
-  Serial.println("888        888  Y8P  888 888        888 T88b   888    888 888        888  Y88888 888    888    888");
-  Serial.println("888        888   '   888 888        888  T88b  Y88b  d88P 888        888   Y8888 Y88b  d88P    888");
-  Serial.println("8888888888 888       888 8888888888 888   T88b  'Y8888P88 8888888888 888    Y888  'Y8888P'     888");
-  Serial.println("");
-  Serial.println("");
-  Serial.println("                           .d8888b. 88888888888 .d88888b.  8888888b.  888");
-  Serial.println("                          d88P  Y88b    888    d88P' 'Y88b 888   Y88b 888");
-  Serial.println("                          Y88b.         888    888     888 888    888 888");
-  Serial.println("                           'Y888b.      888    888     888 888   d88P 888");
-  Serial.println("                              'Y88b.    888    888     888 8888888P'  888");
-  Serial.println("                                '888    888    888     888 888        Y8P");
-  Serial.println("                          Y88b  d88P    888    Y88b. .d88P 888         !");
-  Serial.println("                           'Y8888P'     888     'Y88888P'  888        888");
+  current_drive_motor_direction = forward;
+  current_steering_motor_direction = none;
+  current_drive_motor_speed    = 0;
+  current_steering_motor_speed = 0;
+  target_drive_motor_speed     = 0;
+  target_steering_motor_speed  = 0;
 
+  SendStatus();
+
+}
+void Car::EmergencyStop()
+{
+  SERIALPRINTLN("<<< EMERGENCY STOP >>>");
+
+  HardStop();
+  
+  SERIALPRINTLN("8888888888 888b     d888 8888888888 8888888b.   .d8888b.  8888888888 888b    888  .d8888b. Y88b   d88P");
+  SERIALPRINTLN("888        8888b   d8888 888        888   Y88b d88P  Y88b 888        8888b   888 d88P  Y88b Y88b d88P");
+  SERIALPRINTLN("888        88888b.d88888 888        888    888 888    888 888        88888b  888 888    888  Y88o88P");
+  SERIALPRINTLN("8888888    888Y88888P888 8888888    888   d88P 888        8888888    888Y88b 888 888          Y888P");
+  SERIALPRINTLN("888        888 Y888P 888 888        8888888P'  888  88888 888        888 Y88b888 888           888");
+  SERIALPRINTLN("888        888  Y8P  888 888        888 T88b   888    888 888        888  Y88888 888    888    888");
+  SERIALPRINTLN("888        888   '   888 888        888  T88b  Y88b  d88P 888        888   Y8888 Y88b  d88P    888");
+  SERIALPRINTLN("8888888888 888       888 8888888888 888   T88b  'Y8888P88 8888888888 888    Y888  'Y8888P'     888");
+  SERIALPRINTLN("");
+  SERIALPRINTLN("");
+  SERIALPRINTLN("                           .d8888b. 88888888888 .d88888b.  8888888b.  888");
+  SERIALPRINTLN("                          d88P  Y88b    888    d88P' 'Y88b 888   Y88b 888");
+  SERIALPRINTLN("                          Y88b.         888    888     888 888    888 888");
+  SERIALPRINTLN("                           'Y888b.      888    888     888 888   d88P 888");
+  SERIALPRINTLN("                              'Y88b.    888    888     888 8888888P'  888");
+  SERIALPRINTLN("                                '888    888    888     888 888        Y8P");
+  SERIALPRINTLN("                          Y88b  d88P    888    Y88b. .d88P 888         !");
+  SERIALPRINTLN("                           'Y8888P'     888     'Y88888P'  888        888");
 }
 void Car::Drive( drive_motor_direction direction )
 {
@@ -549,30 +648,44 @@ void Car::Drive( drive_motor_direction direction )
     case forward:
       if (!DirectionIsForward())
       {
-        Serial.println("Changing direction to forward");
+        if ( !DriveMotorStopped() )
+        {
+          SERIALPRINTLN("Stopping drive motor for direction change to forward..");
+          // Slow to a stop
+          SetDriveMotorSpeed( 0 );
+        }
+        else
+        {
+          SERIALPRINTLN("Changing drive motor direction to forward");
 
-        // Slow to a stop
-        SetDriveMotorSpeed( 0 );
-        gpio_put(DRIVE_MOTOR_DIRECTION_PIN, false );
+          gpio_put(DRIVE_MOTOR_DIRECTION_PIN, false );
+          current_drive_motor_direction = forward;
+        }
       } else
       {
-        Serial.println("Maintaining forward direction");
+        SERIALPRINTLN("Maintaining drive motor forward direction");
       }
-      last_drive_motor_direction = forward;
       break;
     case reverse:
       if (!DirectionIsReverse())
       {
-        Serial.println("Changing direction to reverse");
-
-        // Slow to a stop
-        SetDriveMotorSpeed( 0 );
-        gpio_put(DRIVE_MOTOR_DIRECTION_PIN, true );
+        if ( !DriveMotorStopped() )
+        {
+          SERIALPRINTLN("Stopping drive motor for direction change to reverse..");
+          // Slow to a stop
+          SetDriveMotorSpeed( 0 );
+        }
+        else
+        {
+          SERIALPRINTLN("Changing drive motor direction to reverse");
+   
+          gpio_put(DRIVE_MOTOR_DIRECTION_PIN, true );
+          current_drive_motor_direction = reverse;
+        }
       } else
       {
-        Serial.println("Maintaining reverse direction");
+        SERIALPRINTLN("Maintaining drive motor reverse direction");
       }
-      last_drive_motor_direction = reverse;
       break;
   }
 
@@ -582,26 +695,71 @@ void Car::Steer( steering_motor_direction direction )
   // Change direction
   switch (direction) {
     case left:
-      last_steering_motor_direction = left;
-      Serial.println("Steering left");
-
-      gpio_put(STEERING_MOTOR_DIRECTION_PIN, true );
-      gpio_put(STEERING_MOTOR_SPEED_PIN, true );
+      if (!TurningLeft())
+      {
+        if (!SteeringMotorStopped())
+        {
+          SERIALPRINTLN("Stopping steering motor for direction change to left..");
+          // Slow to a stop
+          SetSteeringMotorSpeed( 0 ); 
+        }
+        else
+        {
+          SERIALPRINTLN("Changing steering motor direction to left");
+          gpio_put(STEERING_MOTOR_DIRECTION_PIN, true );
+          SetSteeringMotorSpeed(STEERING_MOTOR_HIGH_SPEED);
+          current_steering_motor_direction = left; 
+        }
+      } else
+      {
+        SERIALPRINTLN("Maintaining left steering direction");
+      }
       break;
     case right:
-      last_steering_motor_direction = right;
-      Serial.println("Steering to right");
-
-      gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
-      gpio_put(STEERING_MOTOR_SPEED_PIN, true );
+      if (!TurningRight())
+      {
+        if (!SteeringMotorStopped())
+        {
+          SERIALPRINTLN("Stopping steering motor for direction change to right..");
+          // Slow to a stop
+          SetSteeringMotorSpeed( 0 ); 
+        }
+        else
+        {
+          SERIALPRINTLN("Changing steering motor direction to right");
+          gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
+          SetSteeringMotorSpeed(STEERING_MOTOR_HIGH_SPEED);
+          current_steering_motor_direction = right; 
+        }
+      } else
+      {
+        SERIALPRINTLN("Maintaining right steering direction");
+      }
       break;
-    default:
-      last_steering_motor_direction = none;
-      Serial.println("Steering cancel");
+    case none:
+      if (Turning())
+      {
+        if (!SteeringMotorStopped())
+        {
+          SERIALPRINTLN("Stopping steering motor for direction change to none..");
+          // Slow to a stop
+          SetSteeringMotorSpeed( 0 );
+        }
+        else
+        {
+          SERIALPRINTLN("Steering none");
 
-      gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
-      gpio_put(STEERING_MOTOR_SPEED_PIN, false );
-      break;
+          gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
+          SetSteeringMotorSpeed(0);
+          current_steering_motor_direction = none;
+        }
+      }
+      else
+      {
+        SERIALPRINTLN("Maintaining forward (no steering) direction");
+      }
+
+      break;    
   }
 }
 uint8_t Car::GetRadarForwardMeasurements(int8_t angle)
@@ -633,7 +791,7 @@ void Car::DecodeFifo(uint32_t fifo_message)
 
   if (fifo_message == RADAR_READY_FIFO_MESSAGE)
   {
-    Serial.println("Radar ready");
+    SERIALPRINTLN("Radar ready");
     SendStatus();
     return;
   }
@@ -641,32 +799,40 @@ void Car::DecodeFifo(uint32_t fifo_message)
   for(uint8_t i=0; i<5; i++) decoded_message[i]=0;
   decoded_message[0] = (fifo_message & 0xFF000000) >> 24;
   decoded_message[1] = (fifo_message & 0x00FF0000) >> 16;
+  decoded_message[2] = (fifo_message & 0x0000FF00) >>  8;
+  decoded_message[3] = (fifo_message & 0x000000FF) >>  0;
 
   switch (decoded_message[0])
   {
     case 'R': // radar measurement
-      Serial.print("Radar  measurement ");
-      angle = ((fifo_message & 0x0000FF00) >> 8);
-      range = (fifo_message & 0x000000FF);
+      SERIALPRINT("Radar measurement ");
+      angle = decoded_message[2];
+      range = decoded_message[3];
       index = (angle / RADAR_MEASUREMENTS_GRANULARITY);
       switch (decoded_message[1])
       {
         case 'F': // forward
-          Serial.print("forward ");
+          SERIALPRINT("forward ");
           radar_forward_measurements[index] = range;
           break;
         case 'R': // rearward
-          Serial.print("rearward ");
+          SERIALPRINT("rearward ");
           radar_rearward_measurements[index] = range;
           break;
         default:
           break;
       }
-      Serial.print(angle);
-      Serial.print(" degs, range ");
-      Serial.println(range);
+      SERIALPRINT(angle);
+      SERIALPRINT(" degs, range ");
+      SERIALPRINTLN(range);
+      break;
+    case 'D': // debug message
+      SERIALPRINT("DEBUG: ");
+      SERIALPRINTLN((char*)&decoded_message[1]);
       break;
     default:
+      SERIALPRINT("Radar sent unexpected message type: ");
+      SERIALPRINTLN(decoded_message);
       break;
   }
 }
@@ -685,7 +851,7 @@ void Car::SendStatus()
   uint32_t message = CAR_FIFO_MESSAGE;
   message = message & 0xFF000000; // C___
   
-  switch (last_steering_motor_direction) {
+  switch (current_steering_motor_direction) {
   case left:
     message = message | 'L' << 8;
     break;
@@ -697,7 +863,7 @@ void Car::SendStatus()
     break;      
   }
 
-  switch (last_drive_motor_direction) {
+  switch (current_drive_motor_direction) {
     case forward:
       message = message | 'F' << 16;
       break;
@@ -706,95 +872,95 @@ void Car::SendStatus()
       break;
   }
 
-  message = message | last_drive_motor_speed;
+  message = message | current_drive_motor_speed;
 
   if (multicore_fifo_wready())
-    multicore_fifo_push_blocking( message ); 
+    multicore_fifo_push_timeout_us( message, 100 ); 
 }
 void Car::DumpRadarMetrics()
 {
-  Serial.println("........................................................................................");
+  SERIALPRINTLN("........................................................................................");
   for(int16_t r=0; r<RADAR_MEASUREMENTS; r++)
   {
-    Serial.print(r*RADAR_MEASUREMENTS_GRANULARITY);
-    Serial.print(":\t");
-    Serial.print(ConvertServoAngleToCarAngle(r*RADAR_MEASUREMENTS_GRANULARITY));
-    Serial.print(":\t");
-    Serial.print(radar_forward_measurements[ r]);
-    Serial.print(",\t");
-    Serial.print(radar_rearward_measurements[r]);
-    Serial.println();
+    SERIALPRINT(r*RADAR_MEASUREMENTS_GRANULARITY);
+    SERIALPRINT(":\t");
+    SERIALPRINT(ConvertServoAngleToCarAngle(r*RADAR_MEASUREMENTS_GRANULARITY));
+    SERIALPRINT(":\t");
+    SERIALPRINT(radar_forward_measurements[ r]);
+    SERIALPRINT(",\t");
+    SERIALPRINT(radar_rearward_measurements[r]);
+    SERIALPRINTLN("");
   }
-    Serial.println("........................................................................................");
+  SERIALPRINTLN("........................................................................................");
   
 }
-void Car::PlotRadarMetrics(int d)
+void Car::PlotRadarMetrics(int diameter)
 {
-  float o,a,h,ft,rt,m,s;
-  int i,r, starty, endy;
-  r = round( d/2 );
-  s = 255/((float) r);
+  float opposite,adjacent,hypotenuse,tangent,m,scale;
+  int i,radius, starty, endy;
+  radius = diameter>>1; // divide by two
+  scale = 255/((float) radius);
 
-  starty = (Stopped()||DirectionIsForward())?r:0;
-  endy   = (Stopped()||DirectionIsReverse())?-r:0;
+  starty = (DriveMotorStopped()||DirectionIsForward())?radius:0;
+  endy   = (DriveMotorStopped()||DirectionIsReverse())?-radius:0;
 
   for (int y=starty; y>=endy; y--)
   {
-    for (int x=-r; x<=r; x++)
+    for (int x=-radius; x<=radius; x++)
     {
-      a = x*s;
-      o = abs(y*s);
-      h = sqrt(pow(a,2)+pow(o,2));
-      rt = 180 - (atan2(o,a)*57.295779513);
-      ft = (atan2(o,a)*57.295779513);
+      adjacent = x*scale;
+      opposite = abs(y*scale);
+      hypotenuse = sqrt(pow(adjacent,2)+pow(opposite,2));
 
       if (y>0)
       {
-        i = round (ft / RADAR_MEASUREMENTS_GRANULARITY);
+        tangent = (atan2(opposite,adjacent)*57.295779513);
+        i = round (tangent / RADAR_MEASUREMENTS_GRANULARITY);
         m = radar_forward_measurements[i];
       }
       else
       {
-        i = round (rt / RADAR_MEASUREMENTS_GRANULARITY);
+        tangent = 180 - (atan2(opposite,adjacent)*57.295779513);
+        i = round (tangent / RADAR_MEASUREMENTS_GRANULARITY);
         m = radar_rearward_measurements[i];
       }
 
       if (y==0)
       {
-        Serial.print( (x==0)? "+":"-");
+        SERIALPRINT( (x==0)? "+":"-");
       }
       else if (x==0)
       {
-        if (h<m)
+        if (hypotenuse<m)
         {
-          Serial.print("#");
+          SERIALPRINT("#");
         }
         else
         {
-          Serial.print( "|");
+          SERIALPRINT( "|");
         }
       }
-      else if (h<m)
+      else if (hypotenuse<m)
       {
-        Serial.print("#");
+        SERIALPRINT("#");
       }
-      else if ((h/255)>1)
+      else if ((hypotenuse/255)>1)
       {
-        Serial.print(" ");
+        SERIALPRINT(" ");
       }
       else
       {
-        if(h<STEERING_FORWARD_RANGE_LIMIT)
+        if(hypotenuse<STEERING_FORWARD_RANGE_LIMIT)
         {
-          Serial.print((h<MINIMUM_FORWARD_RANGE_LIMIT)?".":"¤");
+          SERIALPRINT((hypotenuse<MINIMUM_FORWARD_RANGE_LIMIT)?".":"¤");
         }
         else
         {
-          Serial.print(".");
+          SERIALPRINT(".");
         }
       }
     }      
-    Serial.println();   
+    SERIALPRINTLN("");   
   }
  
 }

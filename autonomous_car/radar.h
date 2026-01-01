@@ -13,10 +13,12 @@
  // brown wire - trigger
  // blue wire  - echo
  
-#define FRONT_ULTRASOUND_TRIG_PIN       2
-#define FRONT_ULTRASOUND_ECHO_PIN       3
-#define REAR_ULTRASOUND_TRIG_PIN        4
-#define REAR_ULTRASOUND_ECHO_PIN        5
+#define FRONT_ULTRASOUND_TRIG_PIN       10
+#define FRONT_ULTRASOUND_ECHO_PIN       11
+// Avoid pin                            12
+// Do not use pin                       13
+#define REAR_ULTRASOUND_TRIG_PIN        14
+#define REAR_ULTRASOUND_ECHO_PIN        15
 
 #define RADAR_ACTIVE_PIN                8
 
@@ -69,6 +71,7 @@ class Radar
     bool TurningLeft();
     bool TurningRight();
 
+    void SendFifoDebugMessage(char*);
 };
 
 
