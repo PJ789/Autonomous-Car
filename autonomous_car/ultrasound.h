@@ -24,8 +24,8 @@ class Ultrasound
     void UltraSound();
     float    Measure();
 
-    static uint32_t                  ultrasound_pulse_start;
-    static uint32_t                  ultrasound_pulse_duration;
+    static volatile uint32_t                  ultrasound_pulse_start;
+    static volatile uint32_t                  ultrasound_pulse_duration;
     static void     UltrasoundIRQCallback(   uint, uint32_t);
    
   private:

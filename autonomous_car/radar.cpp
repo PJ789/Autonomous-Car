@@ -11,28 +11,31 @@ Radar::Radar():front_ultrasound(FRONT_ULTRASOUND_TRIG_PIN,FRONT_ULTRASOUND_ECHO_
   RotateTurret(0);
   RotateTurret(90);
   RotateTurret(0);
-  
-  SetDriveMotorSpeed(0);
-  Drive(forward);
-  Steer(none);
+
+  last_drive_motor_direction = forward;
+  last_steering_motor_direction = none;
+  last_drive_motor_speed = 0;
   
   if (multicore_fifo_wready())
-    multicore_fifo_push_blocking( RADAR_READY_FIFO_MESSAGE );
+    multicore_fifo_push_timeout_us(RADAR_READY_FIFO_MESSAGE, 100);
+
 }
 void Radar::Iterator()
 {
   uint32_t fifo_message;
-
   while (multicore_fifo_rvalid())
   {
-    fifo_message = multicore_fifo_pop_blocking();
-    DecodeFifo( fifo_message );
+    if (multicore_fifo_pop_timeout_us(100, &fifo_message))
+    {
+      DecodeFifo( fifo_message );
+    }
   }
 
+  // Switch to new position and send front, rear, or both measurements
   TurretRotationSequencer();
-    
-  if (multicore_fifo_wready())
-    multicore_fifo_push_blocking( RADAR_READY_FIFO_MESSAGE );
+
+  // Attempt to send a radar ready message when the measurements have been received
+  multicore_fifo_push_timeout_us(RADAR_READY_FIFO_MESSAGE, 100);
 
 }
 void Radar::SetRadarActivePin()
@@ -41,18 +44,18 @@ void Radar::SetRadarActivePin()
 }
 void Radar::TurretRotationSequencer()
 {
-  uint8_t radar_sequence;
-  int16_t target_radar_turret_angle;
-  uint64_t time_millis;
-  uint64_t rotation_interval_ms;
-  uint64_t rotation_steps;
+  uint8_t radar_sequence            = 0;
+  int16_t target_radar_turret_angle = 0;
+  uint64_t time_millis              = 0;
+  uint64_t rotation_interval_ms     = 0;
+  uint64_t rotation_steps           = 0;
 
-   // use pico api to avoid core crashing on millis
+    // use pico api to avoid core crashing on millis
   time_millis=time_us_64()/1000;
 
-  if ( Moving() && !Turning() )
+   if ( Moving() && !Turning() )
   {
-    // base interval, plus 1* ultrasound measurements plus rotation time
+       // base interval, plus 1* ultrasound measurements plus rotation time
     rotation_interval_ms = 100 +(ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
     rotation_steps       = 4;
     radar_sequence = ( time_millis /rotation_interval_ms ) % rotation_steps;
@@ -70,7 +73,7 @@ void Radar::TurretRotationSequencer()
         break;
     }
   }
-  if ( Moving() && Turning() )
+  else if ( Moving() && Turning() )
   {
     // base interval, plus 1* ultrasound measurements plus rotation time
     rotation_interval_ms = 100 +(ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
@@ -116,9 +119,9 @@ void Radar::TurretRotationSequencer()
       }
     }
   }
-  if ( Stopped() )
+  else // if ( Stopped() )
   {
-    // base interval, plus 2* ultrasound measurements plus rotation time
+       // base interval, plus 2* ultrasound measurements plus rotation time
     rotation_interval_ms = 100 +(2*ULTRASOUND_ECHO_TIMEOUT_MILLIS + (RADAR_SCAN_STEP_DEGREES * RADAR_SERVO_MILLIS_PER_DEGREE));
     rotation_steps       = 12;
     radar_sequence = ( time_millis / rotation_interval_ms ) % rotation_steps;
@@ -161,21 +164,27 @@ void Radar::TurretRotationSequencer()
         break;
     }    
   }
-
+ 
   if (target_radar_turret_angle != GetTurretDirection() )
   {
-    RotateTurret(target_radar_turret_angle);
+     RotateTurret(target_radar_turret_angle);
+    }
+  else
+  {
+      // prevent lockup
+    sleep_ms(100);
   }
 
+ 
   if ( MovingForward()  || Stopped() )
   {
-    MeasureFront();
+     MeasureFront();
   }
+
   if ( MovingBackward() || Stopped() )
   {
     MeasureRear();
   }
-  
 }
 int8_t Radar::GetTurretDirection()
 {
@@ -191,13 +200,13 @@ void Radar::RotateTurret(int16_t car_target_angle)
   car_target_angle = (car_target_angle >  90)? 90:car_target_angle;
 
   radar_turret_target_angle = ConvertCarAngleToServoAngle(car_target_angle);
-  
+
   radar_turret_angle_delta = (radar_turret.GetDegrees()>radar_turret_target_angle)?(radar_turret.GetDegrees()-radar_turret_target_angle):(radar_turret_target_angle-radar_turret.GetDegrees());
   radar_turret_turn_time = radar_turret_angle_delta * RADAR_SERVO_MILLIS_PER_DEGREE;
- 
+
+
   radar_turret.SetDegrees(radar_turret_target_angle);
   sleep_ms(radar_turret_turn_time );
-
 }
 uint32_t Radar::MeasureFront()
 {
@@ -213,7 +222,7 @@ uint32_t Radar::MeasureFront()
   measurement_message |= range;
   
   if (multicore_fifo_wready())
-    multicore_fifo_push_blocking(measurement_message);
+    multicore_fifo_push_timeout_us(measurement_message, 100);
 
   return range;
 }
@@ -231,7 +240,7 @@ uint32_t Radar::MeasureRear()
   measurement_message |= range;
   
   if (multicore_fifo_wready())
-    multicore_fifo_push_blocking(measurement_message);
+    multicore_fifo_push_timeout_us(measurement_message, 100);
 
   return range;
 }
@@ -242,53 +251,30 @@ void Radar::ServoDiagnostics()
     switch (test)
     {
       case 0:
-        printf("Servo Calibration\n");
-        printf("-90\n");
         RotateTurret(-90);
-        printf("Radar measurements (f/r):%lu/%lu\n",MeasureFront(),MeasureRear());
         break;
       case 1:
-        printf("Zero\n");
-        RotateTurret(0);
-        printf("Radar measurements (f/r):%lu/%lu\n",MeasureFront(),MeasureRear());
-  
+        RotateTurret(0);         
         break;
       case 2:
-        printf("90\n");
-        RotateTurret(90);
-        printf("Radar measurements (f/r):%lu/%lu\n",MeasureFront(),MeasureRear());
-  
+        RotateTurret(90);        
         break;
       case 3:
-        printf("Zero\n");
-        RotateTurret(0);
-        printf("Radar measurements (f/r):%lu/%lu\n",MeasureFront(),MeasureRear());
-  
+        RotateTurret(0);          
         break;
       case 4:
-        printf("Sweep\n");
         break;
       case 5 ... 185:
-        RotateTurret(test-95);
-        printf("%i\n",test-95);
-        printf("Radar measurements (f/r):%lu/%lu\n",MeasureFront(),MeasureRear());
-  
+        RotateTurret(test-95);                  
         break;
       case 186 ... 366:
-        RotateTurret(276-test);
-        printf("%i\n",276-test);
-        printf("Radar measurements (f/r):%lu/%lu\n",MeasureFront(),MeasureRear());
-  
+        RotateTurret(276-test);                  
         break;
       default:
-        printf("Restarting test cycle");
         test=-1;
         break;
     }
-  }
-
-
-  return;
+  }  return;
 }
 void Radar::SetDriveMotorSpeed( uint8_t s )
 {
@@ -348,47 +334,38 @@ void Radar::DecodeFifo(uint32_t fifo_message)
   decoded_message[2] = (fifo_message & 0x0000FF00) >> 8;
   decoded_message[3] = (fifo_message & 0x000000FF)    ;
 
-  printf("%lu - %s\n", fifo_message, decoded_message );
-
+  
   switch (decoded_message[0])
   {
     case 'C': // Car status
       switch (decoded_message[1])
       {
         case 'F': // forward
-          printf("Drive motor direction forward signal received");
           Drive(forward);
           break;
         case 'R': // reverse
-          printf("Drive motor direction reverse signal received");
           Drive(reverse);
           break;
         default:
-          printf("Unrecognised drive motor message type [%c][%s]\n", decoded_message[1], decoded_message);
           break;
       }
       switch (decoded_message[2])
       {
         case 'L': // left
-          printf("Steering motor steer left signal received");
           Steer(left);
           break;
         case 'R': // reverse
-          printf("Steering motor steer right signal received");
           Steer(right);
           break;
         case 'N': // none
-          printf("Steering motor steer none signal received");
           Steer(none);
           break;
         default:
-          printf("Unrecognised steering motor message type [%c][%s]\n", decoded_message[2], decoded_message);
           break;
       }
       SetDriveMotorSpeed(decoded_message[3]);
-      break;
+      break; // Car status from car to radar
     default:
-      printf("Unrecognised message type [%c][%s]\n", decoded_message[0], decoded_message);
       break;
   }
 }
@@ -414,4 +391,22 @@ uint8_t Radar::ConvertCarAngleToServoAngle(int16_t car_angle)
   servo_angle = car_angle;
   
   return servo_angle;
+}
+
+void Radar::SendFifoDebugMessage(char* message)
+{
+  uint32_t fifo_message;
+
+  fifo_message = CORE1_DEBUG_FIFO_MESSAGE;
+  fifo_message &= 0xFF000000;
+  fifo_message |= ((uint32_t)message[0])<<16;
+  fifo_message |= ((uint32_t)message[1])<<8;
+  fifo_message |= ((uint32_t)message[2])<<0;
+
+  while(!multicore_fifo_wready())
+  {
+    sleep_ms(1);
+  }
+
+  multicore_fifo_push_timeout_us(fifo_message, 100);
 }

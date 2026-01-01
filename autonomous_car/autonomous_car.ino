@@ -1,32 +1,53 @@
 #include <pico/multicore.h>
 #include "car.h"
 #include "radar.h"
+#include "debug.h"
+#include "TickTwo.h"
+
+extern "C" void multicore_launch_core1_with_stack(void (*entry)(void), uint32_t *stack_bottom, size_t stack_size);
+
+static uint32_t core1_stack[8192];  // 32 KB stack (8192 * 4 bytes)
 
 Car car;
 
+TickTwo DriveMotorSpeedControlTicker(
+    [](){ car.DriveMotorSpeedControlCallback(); },
+    DRIVE_MOTOR_RAMP_MILLIS
+);
+TickTwo SteeringMotorSpeedControlTicker(
+    [](){ car.SteeringMotorSpeedControlCallback(); },
+    STEERING_MOTOR_RAMP_MILLIS
+);
+
+
 void setup() {
   //stdio_init_all();
-  Serial.begin(250000);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB
+  Serial.begin(115200);
+  unsigned long start = millis();
+  while (!Serial && (millis() - start < 2000)) {
+  //while (!Serial) {
+    ; // wait up to 2 seconds
   }
-  Serial.println("hello world");
+  SERIALPRINTLN("hello world");
+  delay(500);
 
-  Serial.println("Starting radar on core 1\n");
+  SERIALPRINTLN("Starting radar on core 1\n");
   multicore_reset_core1();
-  multicore_launch_core1(radar_loop);
+  //multicore_launch_core1(radar_loop);
+  multicore_launch_core1_with_stack(radar_loop, core1_stack, sizeof(core1_stack));
      
-  Serial.println("Waiting for radar ready signal\n");
+  SERIALPRINTLN("Waiting for radar ready signal\n");
   uint32_t fifo_message = 0;
   do
   {
-    multicore_fifo_pop_timeout_us(200, &fifo_message);
-    car.HazardLightsOn();
+   multicore_fifo_pop_timeout_us(200, &fifo_message);
+   car.HazardLightsOn();
   }
   while ( fifo_message != RADAR_READY_FIFO_MESSAGE );
-  Serial.println("Radar ready!\n");
+  SERIALPRINTLN("Radar ready!\n");
   car.HazardLightsOff();
-
+  DriveMotorSpeedControlTicker.start();
+  SteeringMotorSpeedControlTicker.start();
 }
 
 
@@ -34,9 +55,12 @@ void setup() {
 // Core0 loop - navigation tasks
 void loop()
 {
-  Serial.print(CLEAR);
+  SERIALPRINT(CLEAR_HOME);
+  SERIALPRINTLN("Main Loop Diagnostics");
+  DriveMotorSpeedControlTicker.update();
+  SteeringMotorSpeedControlTicker.update();
   car.Iterator();
-  //car.DumpRadarMetrics();
+
 }
 
 

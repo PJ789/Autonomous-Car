@@ -7,22 +7,32 @@
 #include "radar.h"
 #include "lights.h"
 
-#define LOW_SPEED                   220
-#define HIGH_SPEED                  255
+
+#define DRIVE_MOTOR_LOW_SPEED        500
+#define DRIVE_MOTOR_HIGH_SPEED      1000
+#define DRIVE_MOTOR_ACCELERATION      50
+#define DRIVE_MOTOR_DECELERATION     100
+#define DRIVE_MOTOR_RAMP_MILLIS       20
+
+#define STEERING_MOTOR_LOW_SPEED    6250
+#define STEERING_MOTOR_HIGH_SPEED   6250
+#define STEERING_MOTOR_ACCELERATION  100
+#define STEERING_MOTOR_DECELERATION  100
+#define STEERING_MOTOR_RAMP_MILLIS    20
+
 // Minimum range before emergency stop
 // below minimum range the car stops
 #define MINIMUM_FORWARD_RANGE_LIMIT  50.0
 #define MINIMUM_REAR_RANGE_LIMIT     50.0
 // Minimum range for steering decisions
 // below steering range the car changes direction
-#define STEERING_FORWARD_RANGE_LIMIT 100.0
-#define STEERING_REAR_RANGE_LIMIT    100.0
+#define STEERING_FORWARD_RANGE_LIMIT 75.0
+#define STEERING_REAR_RANGE_LIMIT    75.0
 
-#define DRIVE_MOTOR_DIRECTION_PIN    10
-#define STEERING_MOTOR_DIRECTION_PIN 11
-#define DRIVE_MOTOR_SPEED_PIN        12
-// Do not use pin                    13
-#define STEERING_MOTOR_SPEED_PIN     14
+#define DRIVE_MOTOR_DIRECTION_PIN     2
+#define STEERING_MOTOR_DIRECTION_PIN  3
+#define DRIVE_MOTOR_SPEED_PIN         4
+#define STEERING_MOTOR_SPEED_PIN      5
 
 // radar
 #define WHEELBASE_METERS  0.26
@@ -56,12 +66,16 @@ class Car
     void DumpRadarMetrics();
     void PlotRadarMetrics(int);
 
+    void DriveMotorSpeedControlCallback();
+    void SteeringMotorSpeedControlCallback();
+
   private:
   
     void SetLights();
     void PlanRoute();
     void PlanSpeed();
-    bool Stopped();
+    bool DriveMotorStopped();
+    bool SteeringMotorStopped();
     bool Moving();
     bool MovingForward();
     bool MovingBackward();
@@ -73,7 +87,9 @@ class Car
     bool ObstacleDetectedAhead(               float );
     bool ObstacleDetectedBehind(              float );
     bool CollisionAvoidance();
-    void SetDriveMotorSpeed(                  uint8_t );
+    void SetDriveMotorSpeed(                  uint16_t );
+    void SetSteeringMotorSpeed(                  uint16_t );
+    void HardStop();
     void EmergencyStop();
     void Drive(                               drive_motor_direction);
     void Steer(                               steering_motor_direction);
@@ -83,12 +99,16 @@ class Car
     uint8_t ConvertCarAngleToRadarAngle(      int16_t );
     void SendStatus();
 
-    steering_motor_direction  last_steering_motor_direction;
-    drive_motor_direction     last_drive_motor_direction;
+    steering_motor_direction  current_steering_motor_direction;
+    drive_motor_direction     current_drive_motor_direction;
 
-    uint8_t                   last_drive_motor_speed;
-    int                       acceleration;
-    int                       deceleration;
+    uint16_t                  current_drive_motor_speed;
+    uint16_t                  current_steering_motor_speed;
+    uint16_t                  target_drive_motor_speed;
+    uint16_t                  target_steering_motor_speed;
+
+    struct repeating_timer   drive_motor_speed_control_ticker;
+    struct repeating_timer   steering_motor_speed_control_ticker;
 
     Lights                    lights;
 
