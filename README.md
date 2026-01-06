@@ -78,9 +78,21 @@ I've worked on this project for a few years, on and off. Now its working, I can 
 - Twist all your power leads, to reduce electro-magnetic interference. The Pico seems vulnerable to EMI, crashing in strange and unpredictable ways.
 - Pay careful attention to interrupt handling code on core1 (used for ultrasound). It is hard enough on core0, but on core1 even more so because you have no way to add debug.
 
+## Roadmap (pun intended)
+
+- Switch chassis, to a hobby grade platform with a 390 motor, servo steering, and ESC controlled main motor
+- Implement LIDAR, for higher speeds, using adaptive 270 overlapping scan zones (forward + left, rearward + right)
+- Add 'oh hell no' sensors for permanent last resort accident prevention
+- Switch to servo controlled steering, for simplicity & finesse
+- Pair the Pico module with an ESP32 CAM module as a co-processor, for wifi monitoring, diagnostics
+- Video streaming from the car (see next item)
+
+ For my finale,
+- Attempt Nvidia Alpamayo AI integration https://developer.nvidia.com/drive/alpamayo for a truly AI autonomous model vehicle
+
 ## Some Caveats
 
-The code is a work in progress, and for interest/reference. Mostly, it's working fully now. E&OE.
+The code is a work in progress, and for interest/reference. Mostly, it's working fully now, apart from the bits where it crashes (the car, not the code). E&OE.
 
 If you find it useful, please enjoy it. If you have suggestions for improvement, I'd be very interested.
 
