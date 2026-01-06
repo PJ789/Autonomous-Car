@@ -21,7 +21,7 @@ The code provides examples of;
 
 The 'radar' turret is [based on this 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back HC-SR04 ultrasound sensors. The ultrasound turret sits ontop of a [DOMAN S0090MD metal gear 9g digital servo](http://www.domanrchobby.com/content/?130.html).
 
-The car has two custom ESC (electronic speed control) circuits, each with an IRLZ44N MOSFET switching a mechanical DPDT relay. The two relays control forward/backward and left/right DC motor direction (by reversing the polarity of the power to the DC motors). Each ESC circuit has a second IRLZ44NMOSFET, used to provide PWM speed control over the motors.
+The car has two custom ESC (electronic speed control) circuits, each with an IRLZ44N MOSFET, switching a mechanical DPDT relay. The two relays control forward/backward and left/right DC motor direction (by reversing the polarity of the power to the DC motors). Each ESC circuit has a second IRLZ44N MOSFET, used to provide PWM speed control over the current to the motors.
 
 The DC motors & their batteries are completely isolated from the digital circuitry using 817 optocouplers.
 
