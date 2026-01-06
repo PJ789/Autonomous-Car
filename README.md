@@ -29,6 +29,7 @@ A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used to int
 
 A buck convertor is used to efficiently supply the steering motor with 5v power, from the 7.2v NiMH battery pack used for the main motor. The digital circuit is powered from a separate high capacity 5v USB powerback.
 
+A full circuit diagram is available [here].(https://raw.githubusercontent.com/PJ789/Autonomous-Car/refs/heads/main/Autonomous%20Car%20Circuit%20Diagram.png)
 
 ## FIFO Protocol
 
