@@ -34,11 +34,11 @@ The code uses a simple protocol to send vehicle movement data from core0 (DC ste
 
 Message formats are 32 bit values, as follows.
 
-###Sent from core0 to core1
+### Sent from core0 to core1
 
-**C[F|R][L|R|N]\<speed as a byte\>** - a car status message conveying forward or reverse state, left right or none turn state, and speed (not currently used on core1). The direction of travel is used by core1 to orientate the radar turret towards the expect path of the vehicle.
+**C[F|R][L|R|N]\<speed as a byte\>** - a car status message conveying forward or reverse state, left right or none turn state, and speed (not currently used on core1). The direction of travel is used by core1 to orientate the radar turret towards the expected path of the vehicle (ideally both then face in the same direction).
 
-###Sent from core1 to core0 
+### Sent from core1 to core0 
 
 **_RDY** - a signal that the radar on core1 is up & operational (used at startup to ensure the vehicle does not set off without working radar). This is periodically restransmitted.
 
