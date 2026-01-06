@@ -21,30 +21,32 @@ The code provides examples of;
 
 The 'radar' turret is [based on this 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back HC-SR04 ultrasound sensors. The ultrasound turret sits ontop of a [DOMAN S0090MD metal gear 9g digital servo](http://www.domanrchobby.com/content/?130.html).
 
-The car has two custom ESC (electronic speed control) circuits, each with an IRLZ44N MOSFET switching a mechanical DPST relay. The two relays control forward/backward and left/right DC motor direction (by reversing the polarity of the power to the DC motors). Each circuit has a second MOSFET, used to provide PWM speed control over the motors.
+The car has two custom ESC (electronic speed control) circuits, each with an IRLZ44N MOSFET switching a mechanical DPDT relay. The two relays control forward/backward and left/right DC motor direction (by reversing the polarity of the power to the DC motors). Each ESC circuit has a second IRLZ44NMOSFET, used to provide PWM speed control over the motors.
 
-A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where necessary, to boost the 3.3V Pico GPIO pins up to 5V.
+The DC motors & their batteries are completely isolated from the digital circuitry using 817 optocouplers.
 
-A buck convertor is used to supply the steering motor with 5v power, from a 7.2v NiMH battery pack used for the main motor. The digital circuit is powered from a large 5v USB powerback.
+A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used to interface to the HC-SR04 ultrasound sensor, to boost the 3.3V Pico GPIO trigger pins up to 5V, and the HC-SR04 echo pin down to 3.3v.
+
+A buck convertor is used to efficiently supply the steering motor with 5v power, from the 7.2v NiMH battery pack used for the main motor. The digital circuit is powered from a large 5v USB powerback.
 
 
 ## FIFO Protocol
 
-The code uses a simple protocol to send vehicle movement data from core0 (DC steering motor & drive motor control, and route planning) to core1 (operates ultrasound 'radar' turret), and in the reverse direction, ultrasound distance & direction information.
+The core running on the two cores uses a simple protocol to send vehicle motor status data from core0 (steering motor control, drive motor control, and route planning) to core1 (operating the ultrasound 'radar' turret). And in the reverse direction, ultrasound distance & direction information from core1 to core0.
 
 Message formats are 32 bit values, as follows.
 
 ### Sent from core0 to core1
 
-**C[F|R][L|R|N]\<speed as a byte\>** - a car status message conveying forward or reverse state, left right or none turn state, and speed (not currently used on core1). The direction of travel is used by core1 to orientate the radar turret towards the expected path of the vehicle (ideally both then face in the same direction).
+**C[F|R][L|R|N]\<speed as a byte\>** - a car status message conveying forward or reverse state, left right or none turn state, and speed (max 255, not currently used on core1). The direction of travel is used by core1 to orientate the radar turret towards the expected path of the vehicle (ideally both then face in the same direction).
 
 ### Sent from core1 to core0 
 
 **_RDY** - a signal that the radar on core1 is up & operational (used at startup to ensure the vehicle does not set off without working radar). This is periodically restransmitted.
 
-**R[F|R]\<angle as a byte\>\<range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor reading, turret angle, range from 0 to 2550cm using 10cm unit resolution
+**R[F|R]\<radar angle as a byte\>\<obstacle range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor reading, turret angle, range from 0 to 2550cm using 10cm unit resolution. The radar data is then used by core0 to perform route planning.
 
-**D\<value 1 as a byte\>\<value 2 as a byte\>\<value 3 as a byte\>** - radar or turret debug message allowing three bytes to be passed from core1 to core 0 to be printed on the Serial console. The radar data is then used by core0 to perform route planning.
+**D\<value 1 as a byte\>\<value 2 as a byte\>\<value 3 as a byte\>** - radar or turret debug message allowing three bytes to be passed from core1 to core 0 to be printed on the Serial console. 
 
 If at any point a message push to the FIFO times out on core1, a warning LED on pin 8 is lit, which is used to indicate loss of radar data sync between core1 and core0. This is a bad situation, because it means the car is navigating without accurate radar information.
 
