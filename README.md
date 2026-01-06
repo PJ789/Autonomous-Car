@@ -27,6 +27,25 @@ A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used, where
 
 A buck convertor is used to supply the steering motor with 5v power, from a 7.2v NiMH battery pack used for the main motor. The digital circuit is powered from a large 5v USB powerback.
 
+
+## FIFO Protocol
+
+The code uses a simple protocol to send vehicle movement data from core0 (DC steering motor & drive motor control, and route planning) to core1 (operates ultrasound 'radar' turret), and in the reverse direction, ultrasound distance & direction information.
+
+Message formats are 32 bit values, as follows.
+
+###Sent from core0 to core1
+
+**C[F|R][L|R|N]<speed as a byte>** - a car status message conveying forward or reverse state, left right or none turn state, and speed (not currently used on core1). The direction of travel is used by core1 to orientate the radar turret towards the expect path of the vehicle.
+
+###Sent from core1 to core0 
+
+**_RDY** - a signal that the radar on core1 is up & operational (used at statup to ensure the vehicle does not set off without working radar). This is periodically restransmitted.
+**R[F|R]<angle as a byte><range (in 10cm units) as a byte>** - radar status message conveying forward or reverse sensor, turret angle, range from 0 to 2550cm at 10cm unit resolution
+**D<value 1 as a byte><value 2 as a byte><value 3 as a byte>** - radar or turret debug message allowing three bytes to be passed from core1 to core 0 to be printed on the Serial console. The radar data is used by core0 to perform route planning.
+
+If at any point a message push to the FIFO times out on core1, a warning LED on pin 8 is lit, which is used to indicates a loss of radar data sync between core1 and core0. This is a bad situation, because it means the car is navigating without accurate radar information.
+
 ## Some Pico Programming Notes
 
 - This code compiles under the Arduino IDE, but also uses the Pico SDK. This creates some awkward problems; particularly because the Pico SDK 'printf' function doesn't work on Core1, and various time related functions are unstable on core1.
