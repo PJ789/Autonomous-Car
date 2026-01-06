@@ -70,8 +70,7 @@ void Ultrasound::UltrasoundIRQCallback(uint gpio, uint32_t events)
   }
   if (events & GPIO_IRQ_EDGE_FALL)
   {
-    uint32_t diff = now-Ultrasound::ultrasound_pulse_start;
-    Ultrasound::ultrasound_pulse_duration = (diff<(ULTRASOUND_ECHO_TIMEOUT_MICROS/2))?diff:0;
+    Ultrasound::ultrasound_pulse_duration = now-Ultrasound::ultrasound_pulse_start;
     Ultrasound::ultrasound_pulse_start    = 0;
     // 🔥 CRITICAL: disable IRQ immediately after falling edge 
     gpio_set_irq_enabled(gpio, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);

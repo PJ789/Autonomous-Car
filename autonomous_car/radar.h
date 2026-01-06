@@ -13,20 +13,26 @@
  // brown wire - trigger
  // blue wire  - echo
  
-#define FRONT_ULTRASOUND_TRIG_PIN       10
-#define FRONT_ULTRASOUND_ECHO_PIN       11
-// Avoid pin                            12
-// Do not use pin                       13
-#define REAR_ULTRASOUND_TRIG_PIN        14
-#define REAR_ULTRASOUND_ECHO_PIN        15
+#define FRONT_ULTRASOUND_TRIG_PIN         10
+#define FRONT_ULTRASOUND_ECHO_PIN         11
+// Avoid pin                              12
+// Do not use pin                         13
+#define REAR_ULTRASOUND_TRIG_PIN          14
+#define REAR_ULTRASOUND_ECHO_PIN          15
 
-#define RADAR_ACTIVE_PIN                8
+// pin used to signal radar lost messages core1->core0
+#define RADAR_LOST_MESSAGE_PIN             8
 
-#define RADAR_SERVO_MILLIS_PER_DEGREE   5
-#define RADAR_SCAN_STEP_DEGREES        25
+// speed of servo rotation used to estimate turn time
+#define RADAR_SERVO_MILLIS_PER_DEGREE      5
+// size of servo turn for each +/- step
+#define RADAR_SCAN_STEP_DEGREES           25
+// time taken for servo to stabilise after a turn stops
+#define RADAR_SERVO_SETTLING_TIME_MILLIS 100
 
-#define RADAR_MEASUREMENTS_GRANULARITY  5
-#define RADAR_MEASUREMENTS              1+(180/RADAR_MEASUREMENTS_GRANULARITY) 
+// parameters used to size the array of ultrasound readings
+#define RADAR_MEASUREMENTS_GRANULARITY     5
+#define RADAR_MEASUREMENTS                 1+(180/RADAR_MEASUREMENTS_GRANULARITY) 
 
 class Radar
 {
@@ -36,17 +42,18 @@ class Radar
     Radar();
 
     void Iterator();
-    void     SetRadarActivePin();
-    uint32_t MeasureFront();
-    uint32_t MeasureRear();   
+    float    MeasureFront();
+    float    MeasureRear();   
     Ultrasound front_ultrasound;
     Ultrasound rear_ultrasound;
    
   private:
     Servo                     radar_turret;
+    uint8_t                   radar_turret_step;
     steering_motor_direction  last_steering_motor_direction;
     drive_motor_direction     last_drive_motor_direction;
     uint8_t                   last_drive_motor_speed;
+
 
     void     TurretRotationSequencer();
     void     RotateTurret(int16_t);
@@ -70,6 +77,8 @@ class Radar
     bool Turning();
     bool TurningLeft();
     bool TurningRight();
+    void SetLostMessageWarningLamp();
+    void ClearLostMessageWarningLamp();
 
     void SendFifoDebugMessage(char*);
 };

@@ -9,7 +9,7 @@
 
 
 #define DRIVE_MOTOR_LOW_SPEED        500
-#define DRIVE_MOTOR_HIGH_SPEED      1000
+#define DRIVE_MOTOR_HIGH_SPEED       750
 #define DRIVE_MOTOR_ACCELERATION      50
 #define DRIVE_MOTOR_DECELERATION     100
 #define DRIVE_MOTOR_RAMP_MILLIS       20
@@ -22,12 +22,12 @@
 
 // Minimum range before emergency stop
 // below minimum range the car stops
-#define MINIMUM_FORWARD_RANGE_LIMIT  50.0
-#define MINIMUM_REAR_RANGE_LIMIT     50.0
+#define MINIMUM_FORWARD_RANGE_LIMIT  150.0
+#define MINIMUM_REAR_RANGE_LIMIT     150.0
 // Minimum range for steering decisions
-// below steering range the car changes direction
-#define STEERING_FORWARD_RANGE_LIMIT 75.0
-#define STEERING_REAR_RANGE_LIMIT    75.0
+// below steering range the car reverses direction
+#define STEERING_FORWARD_RANGE_LIMIT 200.0
+#define STEERING_REAR_RANGE_LIMIT    200.0
 
 #define DRIVE_MOTOR_DIRECTION_PIN     2
 #define STEERING_MOTOR_DIRECTION_PIN  3
@@ -77,6 +77,8 @@ class Car
     bool DriveMotorStopped();
     bool SteeringMotorStopped();
     bool Moving();
+    bool Braking();
+    bool Accelerating();
     bool MovingForward();
     bool MovingBackward();
     bool DirectionIsForward();
@@ -93,8 +95,8 @@ class Car
     void EmergencyStop();
     void Drive(                               drive_motor_direction);
     void Steer(                               steering_motor_direction);
-    uint8_t GetRadarForwardMeasurements(      int8_t);
-    uint8_t GetRadarRearwardMeasurements(     int8_t );
+    uint32_t GetRadarForwardMeasurements(      int8_t);
+    uint32_t GetRadarRearwardMeasurements(     int8_t );
     int16_t ConvertServoAngleToCarAngle(      uint8_t );
     uint8_t ConvertCarAngleToRadarAngle(      int16_t );
     void SendStatus();
@@ -112,9 +114,11 @@ class Car
 
     Lights                    lights;
 
-    uint8_t                   radar_forward_measurements[  RADAR_MEASUREMENTS ];
-    uint8_t                   radar_rearward_measurements[ RADAR_MEASUREMENTS ];
+    uint32_t                  radar_forward_measurements[  RADAR_MEASUREMENTS ];
+    uint32_t                  radar_rearward_measurements[ RADAR_MEASUREMENTS ];
 
+    uint                      fifo_message_count = 0; // used to force the car to gather fifo messages when starting or changing course
+    bool                      status_changed  = true; // used to limit the frequency of status change messages from car to radar
 };
 
 

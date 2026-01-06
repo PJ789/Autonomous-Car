@@ -2,6 +2,8 @@
 
 #define Lights_h
 
+#define BRAKE_RIGHT_LIGHT            16
+#define BRAKE_LEFT_LIGHT             17
 #define FRONT_RIGHT_LIGHT            18
 #define FRONT_LEFT_LIGHT             19
 #define REAR_RIGHT_LIGHT             20
@@ -27,6 +29,10 @@ class Lights
     void RearOff();
     void RearFlash();
     
+    void BrakeOn();
+    void BrakeOff();
+    void BrakeFlash();
+    
     void LeftOn();
     void LeftOff();
     void LeftFlash();
@@ -51,7 +57,13 @@ class Lights
     void RearRightOff();
     void RearRightFlash();
 
+    void BrakeLeftOn();
+    void BrakeLeftOff();
+    void BrakeLeftFlash();
 
+    void BrakeRightOn();
+    void BrakeRightOff();
+    void BrakeRightFlash();
   private:
 
 

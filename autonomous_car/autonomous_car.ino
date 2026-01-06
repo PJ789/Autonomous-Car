@@ -55,8 +55,6 @@ void setup() {
 // Core0 loop - navigation tasks
 void loop()
 {
-  SERIALPRINT(CLEAR_HOME);
-  SERIALPRINTLN("Main Loop Diagnostics");
   DriveMotorSpeedControlTicker.update();
   SteeringMotorSpeedControlTicker.update();
   car.Iterator();
@@ -72,7 +70,6 @@ void radar_loop() // Peripherals
 
   while (true)
   {
-    radar.SetRadarActivePin();
     radar.Iterator();
   }
 }

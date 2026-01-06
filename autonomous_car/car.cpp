@@ -35,33 +35,30 @@ Car::Car(): lights()
 
   HardStop();
  
-  // initialise radar measurements
-  for(int16_t r=0; r<RADAR_MEASUREMENTS; r++)
-  {
-    radar_forward_measurements[ r]=0;
-    radar_rearward_measurements[r]=0;
-  }
-
   lights.Off();
-  for (uint8_t i = 0; i<9; i++)
+  lights.BrakeOff();
+  for (uint8_t i = 0; i<11; i++)
   {
     timeout = make_timeout_time_ms(1000);
     while( !time_reached(timeout) )
     {
       switch(i)
       {
-        case 0: lights.FrontLeftFlash(); break;
-        case 1: lights.RearLeftFlash(); break;
-        case 2: lights.RearRightFlash(); break;
-        case 3: lights.FrontRightFlash(); break;
-        case 4: lights.LeftFlash(); break;
-        case 5: lights.RearFlash(); break;
-        case 6: lights.RightFlash(); break;
-        case 7: lights.FrontFlash(); break;
-        case 8: lights.Flash(); break;
+        case  0: lights.FrontLeftFlash(); break;
+        case  1: lights.RearLeftFlash(); break;
+        case  2: lights.BrakeLeftFlash(); break;
+        case  3: lights.BrakeRightFlash(); break;
+        case  4: lights.RearRightFlash(); break;
+        case  5: lights.FrontRightFlash(); break;
+        case  6: lights.LeftFlash(); break;
+        case  7: lights.RearFlash(); lights.BrakeFlash(); break;
+        case  8: lights.RightFlash(); break;
+        case  9: lights.FrontFlash(); break;
+        case 10: lights.Flash(); break;
       }
     }
     lights.Off();
+    lights.BrakeOff();
   }
 
 }
@@ -84,39 +81,41 @@ void Car::Iterator()
   //  return;
 
   uint32_t fifo_message;
-  static uint     fifo_message_count = 0;
+
 
   while (multicore_fifo_rvalid())
   {
-    if(multicore_fifo_pop_timeout_us(100, &fifo_message))
-    {
-      SERIALPRINTLN("fifo message received on core0");
-      DecodeFifo( fifo_message );
-      fifo_message_count+=1;
-      //PlotRadarMetrics(25);// nb slow
-      //DumpRadarMetrics();        
-    }
-    else
-    {
-      SERIALPRINTLN("Nothing to receive");
-      sleep_ms(250);        
-    }
-
+    fifo_message=multicore_fifo_pop_blocking();
+    SERIALPRINT(CLEAR_HOME);
+    SERIALPRINTLN("fifo message received on core0");
+    DecodeFifo( fifo_message );
+    fifo_message_count+=1;
+    //DumpRadarMetrics();// nb slow
+    //SetLights();
   }
 
-  if (fifo_message_count < 100)
+  if (status_changed)
   {
-      SERIALPRINTLN("Initializing radar data, no movement");
-      SERIALPRINT(fifo_message_count);
+    SERIALPRINTLN("Sending speed/direction status to radar");
+    SendStatus();
+    status_changed = false;
+  }
+
+  if (fifo_message_count < 32)
+  {
+      SERIALPRINTLN("Initializing radar data, suppressing movement");
+      SERIALPRINT(fifo_message_count*(100/32));
       SERIALPRINTLN("% complete");
-      PlotRadarMetrics(25);// nb slow
+      DumpRadarMetrics();// nb slow
+      delay(50);
       SetLights();
       return;
   }
-  fifo_message_count = 100;
+
+  fifo_message_count = 32;
 
   PlanRoute();
-
+  
   if (CollisionAvoidance() )
   {
     SERIALPRINTLN("Collision avoidance activated!");
@@ -137,11 +136,13 @@ void Car::DriveMotorSpeedControlCallback()
   {
     current_drive_motor_speed += DRIVE_MOTOR_ACCELERATION;
     current_drive_motor_speed = (current_drive_motor_speed>target_drive_motor_speed)?target_drive_motor_speed:current_drive_motor_speed;
+    status_changed=true;
   }
   else
   if (current_drive_motor_speed > target_drive_motor_speed)
   {
     current_drive_motor_speed -= min(current_drive_motor_speed, DRIVE_MOTOR_DECELERATION);
+    status_changed=true;
   }
   pwm_set_gpio_level (DRIVE_MOTOR_SPEED_PIN, current_drive_motor_speed );
 }
@@ -152,27 +153,27 @@ void Car::SteeringMotorSpeedControlCallback()
   {
     current_steering_motor_speed += STEERING_MOTOR_ACCELERATION;
     current_steering_motor_speed = (current_steering_motor_speed>target_steering_motor_speed)?target_steering_motor_speed:current_steering_motor_speed;
+    status_changed=true;
   }
   else
   if (current_steering_motor_speed > target_steering_motor_speed)
   {
     current_steering_motor_speed -= min(current_steering_motor_speed, STEERING_MOTOR_DECELERATION);
+    status_changed=true;
   }
   pwm_set_gpio_level(STEERING_MOTOR_SPEED_PIN, current_steering_motor_speed);
-  SERIALPRINT("Setting PWM GPIO LEVEL ON PIN ");
-  SERIALPRINT(STEERING_MOTOR_SPEED_PIN);
-  SERIALPRINT(" TO ");
-  SERIALPRINTLN(current_steering_motor_speed);
 }
 
 
 void Car::HazardLightsOn()
 {
     lights.Flash();
+    lights.BrakeFlash();
 }
 void Car::HazardLightsOff()
 {
     lights.Off();
+    lights.BrakeOff();
 }
 void Car::SetLights()
 {
@@ -181,6 +182,14 @@ void Car::SetLights()
     HazardLightsOn();
     return;
   }
+
+  if (Braking())
+  {
+    lights.RearOff();
+    lights.BrakeOn();
+    return;
+  }
+  lights.BrakeOff();
 
   if (DirectionIsForward())
   {
@@ -299,6 +308,7 @@ void Car::PlanRoute()
       SERIALPRINTLN("Plan Route; obstacle ahead & behind");
       SERIALPRINTLN("Plan Route; decision: no option to change course");
       Steer(none);
+      Drive(forward);
     }
   }
   else if (DirectionIsReverse())
@@ -391,6 +401,7 @@ void Car::PlanSpeed()
   {
     if (ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
     {
+      // We're inside the car's turning circle, and facing an obstacle. time to stop.
       SERIALPRINTLN("Forward Stop");
       SetDriveMotorSpeed(0);
     }
@@ -412,6 +423,7 @@ void Car::PlanSpeed()
   {
     if (ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT))
     {
+      // We're inside the car's turning circle, and facing an obstacle. time to stop.
       SERIALPRINTLN("Reverse Stop");
       SetDriveMotorSpeed(0);
     }
@@ -441,6 +453,14 @@ bool Car::SteeringMotorStopped()
 bool Car::Moving()
 {
   return ( MovingForward() || MovingBackward() );
+}
+bool Car::Braking()
+{
+  return (current_drive_motor_speed > target_drive_motor_speed);
+}
+bool Car::Accelerating()
+{
+  return (current_drive_motor_speed < target_drive_motor_speed);
 }
 bool Car::MovingForward()
 {
@@ -596,6 +616,7 @@ void Car::SetSteeringMotorSpeed(uint16_t s)
 }
 void Car::HardStop()
 {
+  status_changed = true;
   // Power down drive motor
   pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, 0);
   // Power down steering motor
@@ -613,15 +634,22 @@ void Car::HardStop()
   target_drive_motor_speed     = 0;
   target_steering_motor_speed  = 0;
 
-  SendStatus();
+  // Initialise/reset radar measurements (something bad has happened, so clear it out)
+  for(int16_t r=0; r<RADAR_MEASUREMENTS; r++)
+  {
+    radar_forward_measurements[ r]=0;
+    radar_rearward_measurements[r]=0;
+  }
+
+  // force the car to gather fifo messages before moving off
+  fifo_message_count = 0;
 
 }
 void Car::EmergencyStop()
 {
   SERIALPRINTLN("<<< EMERGENCY STOP >>>");
 
-  HardStop();
-  
+
   SERIALPRINTLN("8888888888 888b     d888 8888888888 8888888b.   .d8888b.  8888888888 888b    888  .d8888b. Y88b   d88P");
   SERIALPRINTLN("888        8888b   d8888 888        888   Y88b d88P  Y88b 888        8888b   888 d88P  Y88b Y88b d88P");
   SERIALPRINTLN("888        88888b.d88888 888        888    888 888    888 888        88888b  888 888    888  Y88o88P");
@@ -640,6 +668,11 @@ void Car::EmergencyStop()
   SERIALPRINTLN("                                '888    888    888     888 888        Y8P");
   SERIALPRINTLN("                          Y88b  d88P    888    Y88b. .d88P 888         !");
   SERIALPRINTLN("                           'Y8888P'     888     'Y88888P'  888        888");
+
+  DumpRadarMetrics();
+  HardStop();
+
+  SERIALPRINTLN("<<< END EMERGENCY STOP, CAR REINITIALISING >>>");
 }
 void Car::Drive( drive_motor_direction direction )
 {
@@ -657,9 +690,11 @@ void Car::Drive( drive_motor_direction direction )
         else
         {
           SERIALPRINTLN("Changing drive motor direction to forward");
-
+          status_changed = true;
           gpio_put(DRIVE_MOTOR_DIRECTION_PIN, false );
           current_drive_motor_direction = forward;
+          // force the car to gather fifo messages before moving off
+          fifo_message_count = 0;
         }
       } else
       {
@@ -678,9 +713,11 @@ void Car::Drive( drive_motor_direction direction )
         else
         {
           SERIALPRINTLN("Changing drive motor direction to reverse");
-   
+          status_changed = true;
           gpio_put(DRIVE_MOTOR_DIRECTION_PIN, true );
           current_drive_motor_direction = reverse;
+          // force the car to gather fifo messages before moving off
+          fifo_message_count = 0;
         }
       } else
       {
@@ -706,6 +743,7 @@ void Car::Steer( steering_motor_direction direction )
         else
         {
           SERIALPRINTLN("Changing steering motor direction to left");
+          status_changed = true;
           gpio_put(STEERING_MOTOR_DIRECTION_PIN, true );
           SetSteeringMotorSpeed(STEERING_MOTOR_HIGH_SPEED);
           current_steering_motor_direction = left; 
@@ -727,6 +765,7 @@ void Car::Steer( steering_motor_direction direction )
         else
         {
           SERIALPRINTLN("Changing steering motor direction to right");
+          status_changed = true;
           gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
           SetSteeringMotorSpeed(STEERING_MOTOR_HIGH_SPEED);
           current_steering_motor_direction = right; 
@@ -748,7 +787,7 @@ void Car::Steer( steering_motor_direction direction )
         else
         {
           SERIALPRINTLN("Steering none");
-
+          status_changed = true;
           gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
           SetSteeringMotorSpeed(0);
           current_steering_motor_direction = none;
@@ -762,23 +801,23 @@ void Car::Steer( steering_motor_direction direction )
       break;    
   }
 }
-uint8_t Car::GetRadarForwardMeasurements(int8_t angle)
+uint32_t Car::GetRadarForwardMeasurements(int8_t angle)
 {
   angle = (angle<-90)?-90:angle;
   angle = (angle> 90)? 90:angle;
 
   uint8_t index = ConvertCarAngleToRadarAngle(angle) / RADAR_MEASUREMENTS_GRANULARITY;
-  uint8_t distance = radar_forward_measurements[index];
+  uint32_t distance = radar_forward_measurements[index];
 
   return distance;
 }
-uint8_t Car::GetRadarRearwardMeasurements(int8_t angle)
+uint32_t Car::GetRadarRearwardMeasurements(int8_t angle)
 {
   angle = (angle<-90)?-90:angle;
   angle = (angle> 90)? 90:angle;
 
   uint8_t index = ConvertCarAngleToRadarAngle(angle) / RADAR_MEASUREMENTS_GRANULARITY;
-  uint8_t distance = radar_rearward_measurements[index];
+  uint32_t distance = radar_rearward_measurements[index];
 
   return distance;
 }
@@ -787,12 +826,12 @@ void Car::DecodeFifo(uint32_t fifo_message)
   char decoded_message[5];
   uint8_t index;
   uint8_t angle;
-  uint8_t range;
+  uint8_t range_10cm;
+  uint32_t range_1cm;
 
   if (fifo_message == RADAR_READY_FIFO_MESSAGE)
   {
     SERIALPRINTLN("Radar ready");
-    SendStatus();
     return;
   }
 
@@ -807,24 +846,26 @@ void Car::DecodeFifo(uint32_t fifo_message)
     case 'R': // radar measurement
       SERIALPRINT("Radar measurement ");
       angle = decoded_message[2];
-      range = decoded_message[3];
+      range_10cm = decoded_message[3];
+      range_1cm = 10 * range_10cm; // convert the measurement back from 10cm to 1cm resolution
       index = (angle / RADAR_MEASUREMENTS_GRANULARITY);
       switch (decoded_message[1])
       {
         case 'F': // forward
           SERIALPRINT("forward ");
-          radar_forward_measurements[index] = range;
+          radar_forward_measurements[index] = range_1cm; 
           break;
         case 'R': // rearward
           SERIALPRINT("rearward ");
-          radar_rearward_measurements[index] = range;
+          radar_rearward_measurements[index] = range_1cm;
           break;
         default:
           break;
       }
       SERIALPRINT(angle);
       SERIALPRINT(" degs, range ");
-      SERIALPRINTLN(range);
+      SERIALPRINT(range_1cm);
+      SERIALPRINTLN("cm");
       break;
     case 'D': // debug message
       SERIALPRINT("DEBUG: ");
@@ -851,6 +892,17 @@ void Car::SendStatus()
   uint32_t message = CAR_FIFO_MESSAGE;
   message = message & 0xFF000000; // C___
   
+  // Cd__ - Add forward/reverse status
+  switch (current_drive_motor_direction) {
+    case forward:
+      message = message | 'F' << 16;
+      break;
+    case reverse:
+      message = message | 'R' << 16;
+      break;
+  }
+
+  // Cdt_ - Add steering status
   switch (current_steering_motor_direction) {
   case left:
     message = message | 'L' << 8;
@@ -863,15 +915,7 @@ void Car::SendStatus()
     break;      
   }
 
-  switch (current_drive_motor_direction) {
-    case forward:
-      message = message | 'F' << 16;
-      break;
-    case reverse:
-      message = message | 'R' << 16;
-      break;
-  }
-
+  // Cdt_ - Add speed status
   message = message | current_drive_motor_speed;
 
   if (multicore_fifo_wready())

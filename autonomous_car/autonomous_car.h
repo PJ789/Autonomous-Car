@@ -21,6 +21,7 @@ enum steering_motor_direction {
 // FIFO message is a 32bit int, with RF or RR plus angle (1 byte) plus distance (1 byte)
 #define ENCODE_FIFO_MESSAGE(X) ((uint32_t)(X[0]<<24|X[1]<<16|X[2]<<8|X[3]))
 
+// Radar ready 'magic' message
 #define RADAR_READY_FIFO_MESSAGE           ENCODE_FIFO_MESSAGE("_RDY")
 // R(ange) |   R(ear)  | angle# | distance#, RFad
 #define RADAR_REAR_RANGE_FIFO_MESSAGE      ENCODE_FIFO_MESSAGE("RRad")
