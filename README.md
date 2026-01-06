@@ -1,9 +1,9 @@
 # Autonomous-Car
-An autonomous vehicle based on a Raspberry Pi Pico, using servo motors, DC motors, PWM speed control, ultrasound sensors, interrupts, and multi-core code.
+An autonomous model vehicle based on a Raspberry Pi Pico, using servo motors, DC motors, PWM speed control, ultrasound sensors, interrupts, and multi-core code.
 
 ## Overview
 
-This project repurposes an old RC car to become an autonomous vehicle.
+This project repurposes an old remote control model car to become an autonomous model vehicle.
 
 The car uses a Raspberry Pi Pico for its brains... running code on both cores, using the _official_ [Arduino Core based on Mbed RTOS which includes support for Pico.](https://github.com/arduino/ArduinoCore-mbed/tree/master/variants/RASPBERRY_PI_PICO).
 
