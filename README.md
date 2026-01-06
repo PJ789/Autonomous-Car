@@ -40,13 +40,13 @@ Message formats are 32 bit values, as follows.
 
 ###Sent from core1 to core0 
 
-**_RDY** - a signal that the radar on core1 is up & operational (used at statup to ensure the vehicle does not set off without working radar). This is periodically restransmitted.
+**_RDY** - a signal that the radar on core1 is up & operational (used at startup to ensure the vehicle does not set off without working radar). This is periodically restransmitted.
 
-**R[F|R]\<angle as a byte\>\<range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor, turret angle, range from 0 to 2550cm at 10cm unit resolution
+**R[F|R]\<angle as a byte\>\<range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor reading, turret angle, range from 0 to 2550cm using 10cm unit resolution
 
-**D\<value 1 as a byte\>\<value 2 as a byte\>\<value 3 as a byte\>** - radar or turret debug message allowing three bytes to be passed from core1 to core 0 to be printed on the Serial console. The radar data is used by core0 to perform route planning.
+**D\<value 1 as a byte\>\<value 2 as a byte\>\<value 3 as a byte\>** - radar or turret debug message allowing three bytes to be passed from core1 to core 0 to be printed on the Serial console. The radar data is then used by core0 to perform route planning.
 
-If at any point a message push to the FIFO times out on core1, a warning LED on pin 8 is lit, which is used to indicates a loss of radar data sync between core1 and core0. This is a bad situation, because it means the car is navigating without accurate radar information.
+If at any point a message push to the FIFO times out on core1, a warning LED on pin 8 is lit, which is used to indicate loss of radar data sync between core1 and core0. This is a bad situation, because it means the car is navigating without accurate radar information.
 
 ## Some Pico Programming Notes
 
