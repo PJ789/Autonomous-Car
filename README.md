@@ -84,6 +84,7 @@ I've worked on this project for a few years, on and off. Now its working, I can 
 - Implement LIDAR, for higher speeds, using adaptive 270 overlapping scan zones (forward + left, rearward + right)
 - Add 'oh hell no' sensors for permanent last resort accident prevention
 - Switch to servo controlled steering, for simplicity & finesse
+- Add accelerometers for orientation, impact detection, acceleration/deceleration measurement
 - Pair the Pico module with an ESP32 S3 CAM module as a co-processor, for wifi monitoring, diagnostics
 - Video streaming from the car (see next item)
 
@@ -92,7 +93,7 @@ I've worked on this project for a few years, on and off. Now its working, I can 
 
 ## Some Caveats
 
-The code is a work in progress, and for interest/reference. Mostly, it's working fully now, apart from the bits where it crashes (the car, not the code). E&OE.
+The code is a work in progress, and for interest/reference. Mostly, it's working fully now, apart from the bits where it doesn't and crashes (the car, not the code). E&OE.
 
 If you find it useful, please enjoy it. If you have suggestions for improvement, I'd be very interested.
 
