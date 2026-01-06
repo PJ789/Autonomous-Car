@@ -15,7 +15,7 @@ The code provides examples of;
  - A complex Pico project, compiled under the Arduino IDE
  - Multi-core programming using the [Pico C/C++SDK](https://datasheets.raspberrypi.com/pico/raspberry-pi-pico-c-sdk.pdf)
  - SG90 miniature servo position control using PWM
- - DC motor direction control using GPIO to switch a DPST mechanical relay using a MOSFET
+ - DC motor direction control using GPIO to switch a DPDT mechanical relay using a MOSFET
  - PWM DC motor speed control using GPIO to switch a MOSFET
  - Interrupt driven measurement from ultrasound sensors
 
