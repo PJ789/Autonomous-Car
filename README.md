@@ -32,7 +32,7 @@ A buck convertor is used to efficiently supply the steering motor with 5v power,
 
 ## FIFO Protocol
 
-The core running on the two cores uses a simple protocol to send vehicle motor status data from core0 (steering motor control, drive motor control, and route planning) to core1 (operating the ultrasound 'radar' turret). And in the reverse direction, ultrasound distance & direction information from core1 to core0.
+The code running on the two cores uses a simple protocol to send vehicle motor status data from core0 (steering motor control, drive motor control, and route planning) to core1 (operating the ultrasound 'radar' turret). And in the reverse direction, ultrasound distance & direction information from core1 to core0.
 
 Message formats are 32 bit values, as follows.
 
