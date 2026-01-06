@@ -915,8 +915,9 @@ void Car::SendStatus()
     break;      
   }
 
+  uint16_t speed = (current_drive_motor_speed>255)? 255:current_drive_motor_speed;
   // Cdt_ - Add speed status
-  message = message | current_drive_motor_speed;
+  message = message | speed;
 
   if (multicore_fifo_wready())
     multicore_fifo_push_timeout_us( message, 100 ); 
