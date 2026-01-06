@@ -84,7 +84,7 @@ I've worked on this project for a few years, on and off. Now its working, I can 
 - Implement LIDAR, for higher speeds, using adaptive 270 overlapping scan zones (forward + left, rearward + right)
 - Add 'oh hell no' sensors for permanent last resort accident prevention
 - Switch to servo controlled steering, for simplicity & finesse
-- Pair the Pico module with an ESP32 CAM module as a co-processor, for wifi monitoring, diagnostics
+- Pair the Pico module with an ESP32 S3 CAM module as a co-processor, for wifi monitoring, diagnostics
 - Video streaming from the car (see next item)
 
  For my finale,
