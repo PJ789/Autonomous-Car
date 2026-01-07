@@ -53,7 +53,7 @@ If at any point a message push to the FIFO times out on core1, a warning LED on 
 
 ## Geometry Diagrams
 
-Car geometry is used to abstract from the underlying servo geometry (which is transverse to the car, and inverted because the servo is under the roof).
+Car geometry is used to abstract from the underlying servo geometry (which is transverse to the car, and anti-clockwise/inverted because the servo is _under_ the roof).
 
 <img src="car_geometry.png" height="750"> <img src="servo_geometry.png" height="750">
 
