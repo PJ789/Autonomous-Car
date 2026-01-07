@@ -55,7 +55,7 @@ If at any point a message push to the FIFO times out on core1, a warning LED on 
 
 Car geometry is used to abstract from the underlying servo geometry (which is transverse to the car, and inverted because the servo is under the roof).
 
-<img src="car_geometry.png" width="200"> <img src="servo_geometry.png" width="200">
+<img src="car_geometry.png" height="400"> <img src="servo_geometry.png" height="400">
 
 ## Some Pico Programming Notes
 
