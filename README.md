@@ -1,6 +1,8 @@
 # Autonomous-Car
 An autonomous model vehicle based on a Raspberry Pi Pico, using servo motors, DC motors, PWM speed control, ultrasound sensors, interrupts, and multi-core code.
 
+<img src="autonomous car picture - Copy.png"> 
+
 ## Overview
 
 This project repurposes an old remote control model car to become an autonomous model vehicle.
