@@ -68,7 +68,7 @@ Car geometry is used to abstract from the underlying servo geometry (which is tr
 - To avoid concurrency problems, I also avoided creating heap objects on core1 (so relying on the core1 stack memory almost exclusively, which is not shared with Core0)
 - The default stack size on both cores seems quite small, especially if you are using C++ object oriented code libraries, and also using the stack to avoid creating heap objects (see above). So I increased my stack sizes to the limit by setting compiler flags (-DPICO_STACK_SIZE=0x1000 -DPICO_CORE1_STACK_SIZE=0x1000), also set a custom stack size for code running on core1 in code.
 - To calculate the PWM frequency for a servo, you take the system clock (default 125mhz), divide it by the maximum PWM counter value (default 65535) to arrive at the current PWM frequency. Then pick a clock divider to align with your servo PWM frequency needs. Take a look at the [servo code](https:autonomous_car/servo.cpp) for an example of how this works.
-- If you're going to try your hand at multi-core programming... wire a push button switch to the Pico reset pin. You're going to need it. A lot.
+- If you're going to try your hand at multi-core programming... wire a push button switch to the Pico reset pin. You're going to need it. A lot. (That yellow push button on the front of the bonnet? Take a wild guess what that's for).
 
 ## Some Apologies
 Sorry about the code quality, its ok, but not my best work. Route planning is a bit rudimentary at present. And sorry about any bugs.
