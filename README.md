@@ -53,9 +53,9 @@ If at any point a message push to the FIFO times out on core1, a warning LED on 
 
 ## Geometry Diagrams
 
-Car geometry is used to abstract from the underlying servo geometry (which is transverse to the car, and anti-clockwise/inverted because the servo is _under_ the roof).
+Car geometry is used to abstract from the underlying servo geometry (which is transverse to the car, and anti-clockwise/inverted because the servo is _under_ the roof). Steps Left 3, Left 2, Left 1 etc are constants/shorthand for the angular positions the turret iterates over.
 
-<img src="car_geometry.png" height="750"> <img src="servo_geometry.png" height="750">
+<img src="car_geometry.png" height="650"> <img src="servo_geometry.png" height="650">
 
 ## Some Pico Programming Notes
 
