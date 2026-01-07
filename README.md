@@ -35,7 +35,7 @@ A full circuit diagram is available [here](https://raw.githubusercontent.com/PJ7
 
 ## FIFO Protocol
 
-The code running on the two cores uses a simple protocol to send vehicle motor status data from core0 (steering motor control, drive motor control, and route planning) to core1 (operating the ultrasound 'radar' turret). And in the reverse direction, ultrasound distance & direction information from core1 to core0.
+The tasks running on the two cores use a simple protocol to exchange status information. Core0 sends vehicle motor status data (steering motor control, drive motor control, and route planning) to core1. And in the reverse direction, core 1 (operating the ultrasound 'radar' turret) sends obstacle distance & direction information to core0.
 
 Message formats are 32 bit values, as follows.
 
@@ -49,7 +49,7 @@ Message formats are 32 bit values, as follows.
 
 **R[F|R]\<radar angle as a byte\>\<obstacle range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor reading, turret angle (expressed relative to servo position, 0-180°, see geometry pictures), obstacle range (from 0 to 2550cm in 10cm units resolution). The radar data is then used by core0 to perform route planning.
 
-**D\<value 1 as a byte\>\<value 2 as a byte\>\<value 3 as a byte\>** - radar or turret debug message allowing three bytes to be passed from core1 to core 0 to be printed on the Serial console. 
+**D\<value 1 as a byte\>\<value 2 as a byte\>\<value 3 as a byte\>** - radar or turret debug message allowing three bytes to be passed from core1 to core0 to be printed on the Serial console. 
 
 If at any point a message push to the FIFO times out on core1, a warning LED on pin 8 is lit, which is used to indicate loss of radar data sync between core1 and core0. This is a bad situation, because it means the car is navigating without accurate radar information.
 
