@@ -69,7 +69,7 @@ Car geometry is used to abstract from the underlying servo geometry (which is tr
 - If you're going to try your hand at multi-core programming... wire a push button switch to the Pico reset pin. You're going to need it. A lot.
 
 ## Some Apologies
-Sorry about the code quality. Route planning is elementary at present, tba. And sorry about any bugs.
+Sorry about the code quality, its ok, but not my best work. Route planning is a bit rudimentary at present. And sorry about any bugs.
 
 ## Some Thoughts
 
