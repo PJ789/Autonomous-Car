@@ -35,19 +35,21 @@ A full circuit diagram is available [here](https://raw.githubusercontent.com/PJ7
 
 ## FIFO Protocol
 
-The tasks running on the two cores use a simple protocol to exchange status information. Core0 sends vehicle motor status data (steering motor control, drive motor control, and route planning) to core1. And in the reverse direction, core 1 (operating the ultrasound 'radar' turret) sends obstacle distance & direction information to core0.
+The tasks running on the two cores use a simple protocol to exchange status information. Core0 (steering motor control, drive motor control, and route planning) sends vehicle motor status data to core1. And in the reverse direction, core 1 (operating the ultrasound 'radar' turret) sends obstacle distance & direction information to core0.
+
+Core0 uses the 'radar' data to decide on the next manoeuvre, core1 uses the vehicle motor information to direct the 'radar' toward the expected path of the vehicle (ideally both then face in the same direction).
 
 Message formats are 32 bit values, as follows.
 
 ### Sent from core0 to core1
 
-**C[F|R][L|R|N]\<speed as a byte\>** - a car status message conveying forward or reverse state, left right or none turn state, and speed (max 255, not currently used on core1). The direction of travel is used by core1 to orientate the radar turret towards the expected path of the vehicle (ideally both then face in the same direction).
+**C[F|R][L|R|N]\<speed as a byte\>** - a car status message conveying forward or reverse state, left right or none turn state, and speed (max 255, not currently used on core1). 
 
 ### Sent from core1 to core0 
 
 **_RDY** - a signal that the radar on core1 is up & operational (used at startup to ensure the vehicle does not set off without working radar). This is periodically restransmitted.
 
-**R[F|R]\<radar angle as a byte\>\<obstacle range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor reading, turret angle (expressed relative to servo position, 0-180°, see geometry pictures), obstacle range (from 0 to 2550cm in 10cm units resolution). The radar data is then used by core0 to perform route planning.
+**R[F|R]\<radar angle as a byte\>\<obstacle range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor reading, turret angle (expressed relative to servo position, 0-180°, see geometry pictures), obstacle range (from 0 to 2550cm in 10cm units resolution). 
 
 **D\<value 1 as a byte\>\<value 2 as a byte\>\<value 3 as a byte\>** - radar or turret debug message allowing three bytes to be passed from core1 to core0 to be printed on the Serial console. 
 
