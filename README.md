@@ -45,11 +45,19 @@ Message formats are 32 bit values, as follows.
 
 **_RDY** - a signal that the radar on core1 is up & operational (used at startup to ensure the vehicle does not set off without working radar). This is periodically restransmitted.
 
-**R[F|R]\<radar angle as a byte\>\<obstacle range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor reading, turret angle, range from 0 to 2550cm using 10cm unit resolution. The radar data is then used by core0 to perform route planning.
+**R[F|R]\<radar angle as a byte\>\<obstacle range \(in 10cm units\) as a byte\>** - radar status message conveying forward or reverse sensor reading, turret angle (expressed relative to servo position, 0-180°, see geometry pictures), obstacle range (from 0 to 2550cm in 10cm units resolution). The radar data is then used by core0 to perform route planning.
 
 **D\<value 1 as a byte\>\<value 2 as a byte\>\<value 3 as a byte\>** - radar or turret debug message allowing three bytes to be passed from core1 to core 0 to be printed on the Serial console. 
 
 If at any point a message push to the FIFO times out on core1, a warning LED on pin 8 is lit, which is used to indicate loss of radar data sync between core1 and core0. This is a bad situation, because it means the car is navigating without accurate radar information.
+
+## Geometry Diagrams
+
+Car geometry is used to abstract from the underlying servo geometry (which is transverse to the car, and inverted because the servo is under the roof).
+
+![Car Geometry](car_geometry.png)
+
+![Servo Geometry](servo_geometry.png)
 
 ## Some Pico Programming Notes
 
