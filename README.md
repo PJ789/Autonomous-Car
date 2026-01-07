@@ -81,12 +81,12 @@ I've worked on this project for a few years, on and off. Now its working, I can 
 
 ## Roadmap (pun intended)
 
-- Switch chassis, to a hobby grade platform with a 390 motor, servo steering, and ESC controlled main motor
-- Implement LIDAR, for higher speeds, using adaptive 270 overlapping scan zones (forward + left, rearward + right)
+- Switch chassis, to a hobby grade HSP/Himoto 1/16 buggy platform with a 390 main motor, ESC controlled main motor, and 3 wire servo steering
+- Implement LIDAR, for higher speeds, using adaptive 270° overlapping field of view scan zones (180° forward + 90° left side, 180° rearward + 90° right side)
 - Add 'oh hell no' sensors for permanent last resort accident prevention
 - Switch to servo controlled steering, for simplicity & finesse
 - Add accelerometers for orientation, impact detection, acceleration/deceleration measurement
-- Pair the Pico module with an ESP32 S3 CAM module as a co-processor, for wifi monitoring, diagnostics
+- Pair the Pico module with an ESP32 S3 CAM module as a co-processor, for wifi streaming of monitoring, diagnostics info
 - Video streaming from the car (see next item)
 
  For my finale,
