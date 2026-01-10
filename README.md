@@ -94,7 +94,7 @@ I've worked on this project for a few years, on and off. Now its working, I can 
 - Switch chassis, to a hobby grade HSP/Himoto 1/16 buggy platform with a 390 main motor, ESC controlled main motor, and 3 wire servo steering
 - Implement LIDAR, for higher speeds, using adaptive 270° overlapping field of view scan zones (180° forward + 90° left side, 180° rearward + 90° right side)
 - Add 'oh hell no' sensors for permanent last resort accident prevention
-- ~~Switch to servo controlled steering, for simplicity & finesse~~ Done! [See video here](servo_steering.mp4) The old steering DC motor & reduction gears were removed, and an analogue servo installed on a 3D printed bracket. The servo horn pushes the old steering arm which is still mounted on the (empty) steering gearbox, effectively acting as a bearing for the steering arm axle.
+- ~~Switch to servo controlled steering, for simplicity & finesse~~ Done! [See video here](servo_steering.mp4) The old steering DC motor & reduction gears were removed, and an analogue servo installed on a 3D printed bracket. The servo horn pushes the old steering pitman arm which is still mounted on the (empty) steering gearbox. The steering gearbox is effectively acting as a simple bearing for the steering arm axle.
 - Add accelerometers for orientation, impact detection, acceleration/deceleration measurement
 - Pair the Pico module with an ESP32 S3 CAM module as a co-processor, for wifi streaming of monitoring, diagnostics info
 - Video streaming from the car (see next item)
