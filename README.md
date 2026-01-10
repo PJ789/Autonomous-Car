@@ -23,7 +23,7 @@ The code provides examples of;
 
 The 'radar' turret is [based on this own design 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back ultrasound sensors. The ultrasound turret sits on top of a digital servo.
 
-###8v Volt Main Battery Circuit
+### 8v Volt Main Battery Circuit
 The main battery is a 6 cell NiMH battery pack (circa 8v).
 
 The car has a custom ESC (electronic speed control) circuit for the 8v main driving motor. The ESC circuit has a mechanical DPDT relay, switched by an IRLZ44N MOSFET.
@@ -32,7 +32,7 @@ The DPDT relays control forward/backward DC motor direction (by reversing the po
 
 The ESC circuit also has a second IRLZ44N MOSFET, used to provide PWM speed control over the power to the motor.
 
-###5v Volt Motor Circuit
+### 5v Volt Motor Circuit
 A buck convertor is used to efficiently supply 5v power (reducing the voltage from the main battery pack). 
 
 The turret uses a 5v DOMAN S0090MD metal gear 9g digital servo. It rotates 180°, directing forward & rearward facing HC-SR04 ultrasound sensors (giving 360° coverage). NB: The ultrasound sensors are connected to the digital circuit.
@@ -41,7 +41,7 @@ The steering rack has been modified to use a 5v EMAX ES08MA II 12g metal gear an
 
 The motors & their batteries are completely isolated from the digital circuitry using 817 optocouplers. There is no common ground between analogue & digital circuits.
 
-###5 Volt Digital Circuit
+### 5 Volt Digital Circuit
 The digital electronics are powered from a separate high capacity 5v USB powerbank.
 
 The digital circuit comprises a Raspberry Pico, two HC-SR04  ultrasound sensors, and a TXS0108E 8 Channel Bi-Directional Logic Level Converter.
@@ -50,7 +50,7 @@ The logic level converter is used to interface the Pico to the ultrasound sensor
 
 6 leds 'lamps' (2x white headlight, 2x rear reversing lights, 2x rear brake lights) are installed at each corner of the car, and one red warning LED on the roof to signal loss of communication between core0 & core1 of the Pico.
 
-###Circuit Diagram
+### Circuit Diagram
 A full circuit diagram is available [here](https://raw.githubusercontent.com/PJ789/Autonomous-Car/refs/heads/main/Autonomous%20Car%20Circuit%20Diagram.png)
 
 ## FIFO Protocol
