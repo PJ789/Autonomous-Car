@@ -46,9 +46,9 @@ The digital electronics are powered from a separate high capacity 5v USB powerba
 
 The digital circuit comprises a Raspberry Pico, two HC-SR04  ultrasound sensors, and a TXS0108E 8 Channel Bi-Directional Logic Level Converter.
 
-The logic level converter is used to interface the Pico to the ultrasound sensors, to boost the 3.3V Pico GPIO ultrasoundtrigger pins up to 5V, and bring the ultrasound echo pin down to 3.3v.
+The logic level converter is used to interface the Pico to the ultrasound sensors, to boost the 3.3V Pico GPIO ultrasound trigger pins up to 5V, and bring the 5v ultrasound echo pin down to 3.3v.
 
-6 leds 'lamps' (2x white headlight, 2x rear reversing lights, 2x rear brake lights) are installed at each corner of the car, and one red warning LED on the roof to signal loss of communication between core0 & core1 of the Pico.
+6 leds 'lamps' (2x white headlights, 2x rear reversing lights, 2x rear brake lights) are installed at each corner of the car, and one red warning LED on the roof to signal loss of communication between core0 & core1 of the Pico.
 
 ### Circuit Diagram
 A full circuit diagram is available [here](https://raw.githubusercontent.com/PJ789/Autonomous-Car/refs/heads/main/Autonomous%20Car%20Circuit%20Diagram.png)
