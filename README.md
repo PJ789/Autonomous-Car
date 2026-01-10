@@ -21,16 +21,36 @@ The code provides examples of;
  - PWM DC motor speed control using GPIO to switch a MOSFET
  - Interrupt driven measurement from ultrasound sensors
 
-The 'radar' turret is [based on this 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back HC-SR04 ultrasound sensors. The ultrasound turret sits on top of a [DOMAN S0090MD metal gear 9g digital servo](http://www.domanrchobby.com/content/?130.html).
+The 'radar' turret is [based on this own design 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back ultrasound sensors. The ultrasound turret sits on top of a digital servo.
 
-The car has two custom ESC (electronic speed control) circuits. Each of the two ESC circuits has an IRLZ44N MOSFET, for switching a mechanical DPDT relay. The DPDT relays control forward/backward and left/right DC motor direction (by reversing the polarity of the power to the driving and steering DC motors). Each of the two ESC circuits also has a second IRLZ44N MOSFET, used to provide PWM speed control over the power to the motors.
+###8v Volt Main Battery Circuit
+The main battery is a 6 cell NiMH battery pack (circa 8v).
 
-The DC motors & their batteries are completely isolated from the digital circuitry using 817 optocouplers.
+The car has a custom ESC (electronic speed control) circuit for the 8v main driving motor. The ESC circuit has a mechanical DPDT relay, switched by an IRLZ44N MOSFET.
 
-A 5V/3.3V TXS0108E 8 Channel Bi-Directional Logic Level Converter is used to interface to the HC-SR04 ultrasound sensor, to boost the 3.3V Pico GPIO trigger pins up to 5V, and bring the HC-SR04 echo pin down to 3.3v.
+The DPDT relays control forward/backward DC motor direction (by reversing the polarity of the power to the driving DC motor).
 
-A buck convertor is used to efficiently supply the steering motor with 5v power, from the 7.2v NiMH battery pack used for the main motor. The digital circuit is powered from a separate high capacity 5v USB powerback.
+The ESC circuit also has a second IRLZ44N MOSFET, used to provide PWM speed control over the power to the motor.
 
+###5v Volt Motor Circuit
+A buck convertor is used to efficiently supply 5v power (reducing the voltage from the main battery pack). 
+
+The turret uses a 5v DOMAN S0090MD metal gear 9g digital servo. It rotates 180°, directing forward & rearward facing HC-SR04 ultrasound sensors (giving 360° coverage). NB: The ultrasound sensors are connected to the digital circuit.
+
+The steering rack has been modified to use a 5v EMAX ES08MA II 12g metal gear analogue servo (rather than the DC 'bang-bang' motor it was originally equipped with).
+
+The motors & their batteries are completely isolated from the digital circuitry using 817 optocouplers. There is no common ground between analogue & digital circuits.
+
+###5 Volt Digital Circuit
+The digital electronics are powered from a separate high capacity 5v USB powerbank.
+
+The digital circuit comprises a Raspberry Pico, two HC-SR04  ultrasound sensors, and a TXS0108E 8 Channel Bi-Directional Logic Level Converter.
+
+The logic level converter is used to interface the Pico to the ultrasound sensors, to boost the 3.3V Pico GPIO ultrasoundtrigger pins up to 5V, and bring the ultrasound echo pin down to 3.3v.
+
+6 leds 'lamps' (2x white headlight, 2x rear reversing lights, 2x rear brake lights) are installed at each corner of the car, and one red warning LED on the roof to signal loss of communication between core0 & core1 of the Pico.
+
+###Circuit Diagram
 A full circuit diagram is available [here](https://raw.githubusercontent.com/PJ789/Autonomous-Car/refs/heads/main/Autonomous%20Car%20Circuit%20Diagram.png)
 
 ## FIFO Protocol
