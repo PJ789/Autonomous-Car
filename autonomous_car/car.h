@@ -12,47 +12,46 @@
 #define DRIVE_MOTOR_HIGH_SPEED       750
 #define DRIVE_MOTOR_ACCELERATION      50
 #define DRIVE_MOTOR_DECELERATION     100
-#define DRIVE_MOTOR_RAMP_MILLIS       20
-
-#define STEERING_MOTOR_LOW_SPEED    6250
-#define STEERING_MOTOR_HIGH_SPEED   6250
-#define STEERING_MOTOR_ACCELERATION  100
-#define STEERING_MOTOR_DECELERATION  100
-#define STEERING_MOTOR_RAMP_MILLIS    20
+#define DRIVE_MOTOR_RAMP_INTERVAL_MILLIS       20
 
 // Minimum range before emergency stop
-// below minimum range the car stops
-#define MINIMUM_FORWARD_RANGE_LIMIT  150.0
-#define MINIMUM_REAR_RANGE_LIMIT     150.0
-// Minimum range for steering decisions
-// below steering range the car reverses direction
-#define STEERING_FORWARD_RANGE_LIMIT 200.0
-#define STEERING_REAR_RANGE_LIMIT    200.0
+// Below minimum range the car performs a hard-stop, and flushes out radar data
+// 150 - floor testing
+//  25 - bench testing
+#define OBSTACLE_AHEAD_EMERGENCY_STOP_RANGE_LIMIT_CM  150.0
+#define OBSTACLE_BEHIND_EMERGENCY_STOP_RANGE_LIMIT_CM 150.0
+// Minimum range for manoeuvering decisions
+// Below steering range the car attempts to reverse direction rather than manoeuvre
+// 200 - floor testing
+// 100 - bench testing
+#define OBSTACLE_AHEAD_MANOEUVERING_RANGE_LIMIT_CM   200.0
+#define OBSTACLE_BEHIND_MANOEUVERING_RANGE_LIMIT_CM  200.0
 
 #define DRIVE_MOTOR_DIRECTION_PIN     2
-#define STEERING_MOTOR_DIRECTION_PIN  3
 #define DRIVE_MOTOR_SPEED_PIN         4
-#define STEERING_MOTOR_SPEED_PIN      5
+// Pins 6 & 7 are channels A & B of PWM 3
+#define STEERING_MOTOR_PIN            7
 
-// radar
-#define WHEELBASE_METERS  0.26
-#define AXEL_WIDTH_METERS 0.23
+// steering motor
+// these angles are not car angles, they are servo motor rotations
+#define STEERING_MOTOR_MAX_LEFT_ANGLE    (90+20)
+#define STEERING_MOTOR_CENTRE_ANGLE      (90)
+#define STEERING_MOTOR_MAX_RIGHT_ANGLE   (90-20)
 
-#define STEERING_ANGLE_DEGS 25.0
-#define STEERING_ANGLE_RADS ((STEERING_ANGLE_DEGS * 71.0) / 4068.0)
-
-#define FRONT_INNER_TURN_RADIUS_METERS (WHEELBASE_METERS/sin(STEERING_ANGLE_RADS))
-#define FRONT_OUTER_TURN_RADIUS_METERS (FRONT_INNER_TURN_RADIUS_METERS+AXEL_WIDTH_METERS)
-#define REAR_INNER_TURN_RADIUS_METERS  (sqrt( pow(FRONT_INNER_TURN_RADIUS_METERS,2)-pow(WHEELBASE_METERS,2) ) )
-#define REAR_OUTER_TURN_RADIUS_METERS  (REAR_INNER_TURN_RADIUS_METERS+AXEL_WIDTH_METERS)
-
+// Scan steps used by heuristics to compare radar readings, and decide on manoeuvres
+// these are relative to the car
 #define LEFT3       (-3* RADAR_SCAN_STEP_DEGREES)
 #define LEFT2       (-2* RADAR_SCAN_STEP_DEGREES)
 #define LEFT1       (-1* RADAR_SCAN_STEP_DEGREES)
 #define DEAD_AHEAD  ( 0                         )
+#define DEAD_BEHIND ( 0                         )
 #define RIGHT1      ( 1* RADAR_SCAN_STEP_DEGREES)
 #define RIGHT2      ( 2* RADAR_SCAN_STEP_DEGREES)
 #define RIGHT3      ( 3* RADAR_SCAN_STEP_DEGREES)
+
+// Biases the planning algorithm to avoid rapid turn changes unless there is a 20cm benefit from better range
+#define TURN_CHANGE_HYSTERESIS_CM       20
+
 class Car
 {
 
@@ -67,7 +66,6 @@ class Car
     void PlotRadarMetrics(int);
 
     void DriveMotorSpeedControlCallback();
-    void SteeringMotorSpeedControlCallback();
 
   private:
   
@@ -75,12 +73,11 @@ class Car
     void PlanRoute();
     void PlanSpeed();
     bool DriveMotorStopped();
-    bool SteeringMotorStopped();
     bool Moving();
     bool Braking();
     bool Accelerating();
     bool MovingForward();
-    bool MovingBackward();
+    bool MovingReverse();
     bool DirectionIsForward();
     bool DirectionIsReverse();
     bool Turning();
@@ -90,14 +87,13 @@ class Car
     bool ObstacleDetectedBehind(              float );
     bool CollisionAvoidance();
     void SetDriveMotorSpeed(                  uint16_t );
-    void SetSteeringMotorSpeed(                  uint16_t );
     void HardStop();
     void EmergencyStop();
     void Drive(                               drive_motor_direction);
     void Steer(                               steering_motor_direction);
-    uint32_t GetRadarForwardMeasurements(      int8_t);
-    uint32_t GetRadarRearwardMeasurements(     int8_t );
-    int16_t ConvertServoAngleToCarAngle(      uint8_t );
+    uint32_t GetDistancetoObstacleAhead(      int8_t);
+    uint32_t GetDistancetoObstacleBehind(     int8_t );
+    int16_t ConvertRadarAngleToCarAngle(      uint8_t );
     uint8_t ConvertCarAngleToRadarAngle(      int16_t );
     void SendStatus();
 
@@ -105,20 +101,19 @@ class Car
     drive_motor_direction     current_drive_motor_direction;
 
     uint16_t                  current_drive_motor_speed;
-    uint16_t                  current_steering_motor_speed;
     uint16_t                  target_drive_motor_speed;
-    uint16_t                  target_steering_motor_speed;
 
-    struct repeating_timer   drive_motor_speed_control_ticker;
-    struct repeating_timer   steering_motor_speed_control_ticker;
-
+    struct repeating_timer    drive_motor_speed_control_ticker;
+    
     Lights                    lights;
 
-    uint32_t                  radar_forward_measurements[  RADAR_MEASUREMENTS ];
-    uint32_t                  radar_rearward_measurements[ RADAR_MEASUREMENTS ];
+    uint32_t                  radar_front_measurements[  RADAR_MEASUREMENTS ];
+    uint32_t                  radar_rear_measurements[ RADAR_MEASUREMENTS ];
 
     uint                      fifo_message_count = 0; // used to force the car to gather fifo messages when starting or changing course
     bool                      status_changed  = true; // used to limit the frequency of status change messages from car to radar
+
+    Servo                     steering_motor;
 };
 
 

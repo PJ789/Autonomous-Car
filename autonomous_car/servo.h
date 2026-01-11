@@ -7,10 +7,6 @@
 #include <hardware/clocks.h>
 #include <pico/multicore.h>
 
-// Pins 6 & 7 are channels A & B of PWM 3
-#define RADAR_TURRET_PIN                6
-// Do not use pin                       7
-
 // 50Hz - duration of a single cycle is 20000us
 #define SERVO_PWM_CYCLE_LENGTH_US     20000.f
 // Wrap level - maximum level of the pwm counter
@@ -32,7 +28,7 @@
 class Servo
 {
     public:
-      Servo();
+      Servo(uint8_t);
       void SetDegrees(float);
       uint8_t GetDegrees();
 

@@ -12,11 +12,7 @@ Car car;
 
 TickTwo DriveMotorSpeedControlTicker(
     [](){ car.DriveMotorSpeedControlCallback(); },
-    DRIVE_MOTOR_RAMP_MILLIS
-);
-TickTwo SteeringMotorSpeedControlTicker(
-    [](){ car.SteeringMotorSpeedControlCallback(); },
-    STEERING_MOTOR_RAMP_MILLIS
+    DRIVE_MOTOR_RAMP_INTERVAL_MILLIS
 );
 
 
@@ -47,7 +43,6 @@ void setup() {
   SERIALPRINTLN("Radar ready!\n");
   car.HazardLightsOff();
   DriveMotorSpeedControlTicker.start();
-  SteeringMotorSpeedControlTicker.start();
 }
 
 
@@ -56,7 +51,6 @@ void setup() {
 void loop()
 {
   DriveMotorSpeedControlTicker.update();
-  SteeringMotorSpeedControlTicker.update();
   car.Iterator();
 
 }

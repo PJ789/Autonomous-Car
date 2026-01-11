@@ -10,6 +10,9 @@
 #include "Servo.h"
 #include "Ultrasound.h"
 
+// Pins 6 & 7 are channels A & B of PWM 3
+#define RADAR_TURRET_PIN                    6
+
  // brown wire - trigger
  // blue wire  - echo
  
@@ -41,9 +44,10 @@ class Radar
 
     Radar();
 
-    void Iterator();
-    float    MeasureFront();
-    float    MeasureRear();   
+    void       Iterator();
+    float      MeasureFront();
+    float      MeasureRear();
+
     Ultrasound front_ultrasound;
     Ultrasound rear_ultrasound;
    

@@ -1,15 +1,13 @@
 #include "car.h"
 #include "debug.h"
 
-Car::Car(): lights()
+Car::Car(): lights(), steering_motor(STEERING_MOTOR_PIN)
 {
 
   absolute_time_t timeout;
 
   _gpio_init(   DRIVE_MOTOR_DIRECTION_PIN);
   gpio_set_dir( DRIVE_MOTOR_DIRECTION_PIN,    GPIO_OUT);
-  _gpio_init(   STEERING_MOTOR_DIRECTION_PIN);
-  gpio_set_dir( STEERING_MOTOR_DIRECTION_PIN, GPIO_OUT);
 
   gpio_set_function(DRIVE_MOTOR_SPEED_PIN, GPIO_FUNC_PWM);
   // Find out which PWM slice is connected to pin
@@ -21,17 +19,6 @@ Car::Car(): lights()
   pwm_set_gpio_level (DRIVE_MOTOR_SPEED_PIN, 0 );
   // Set the PWM running
   pwm_set_enabled(drive_motor_slice_num, true);
-
-  gpio_set_function(STEERING_MOTOR_SPEED_PIN, GPIO_FUNC_PWM);
-  // Find out which PWM slice is connected to pin
-  uint16_t steering_motor_slice_num = pwm_gpio_to_slice_num(STEERING_MOTOR_SPEED_PIN);
-  // System clock is 125 MHz by default
-  // For 20 kHz, period = 125e6 / 20e3 = 6250 counts
-  pwm_set_wrap(steering_motor_slice_num, 6249);
-  //  pwm_set_wrap(slice_num, 255);
-  pwm_set_gpio_level (STEERING_MOTOR_SPEED_PIN, 0 );
-  // Set the PWM running
-  pwm_set_enabled(steering_motor_slice_num, true);
 
   HardStop();
  
@@ -147,22 +134,6 @@ void Car::DriveMotorSpeedControlCallback()
   pwm_set_gpio_level (DRIVE_MOTOR_SPEED_PIN, current_drive_motor_speed );
 }
 
-void Car::SteeringMotorSpeedControlCallback()
-{
-  if (current_steering_motor_speed < target_steering_motor_speed)
-  {
-    current_steering_motor_speed += STEERING_MOTOR_ACCELERATION;
-    current_steering_motor_speed = (current_steering_motor_speed>target_steering_motor_speed)?target_steering_motor_speed:current_steering_motor_speed;
-    status_changed=true;
-  }
-  else
-  if (current_steering_motor_speed > target_steering_motor_speed)
-  {
-    current_steering_motor_speed -= min(current_steering_motor_speed, STEERING_MOTOR_DECELERATION);
-    status_changed=true;
-  }
-  pwm_set_gpio_level(STEERING_MOTOR_SPEED_PIN, current_steering_motor_speed);
-}
 
 
 void Car::HazardLightsOn()
@@ -231,175 +202,163 @@ void Car::SetLights()
 void Car::PlanRoute()
 {
   SERIALPRINTLN("Plan Route\n");
-  if (DirectionIsForward())
+
+  // Change direction if a turn manouevre is not possible
+
+  if (
+    (DirectionIsForward() && ObstacleDetectedAhead(OBSTACLE_AHEAD_MANOEUVERING_RANGE_LIMIT_CM))
+    ||
+    (DirectionIsReverse() && ObstacleDetectedBehind(OBSTACLE_BEHIND_MANOEUVERING_RANGE_LIMIT_CM))
+    )
   {
-    SERIALPRINTLN("Plan Route; current direction is forward\n");
-    if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
+    if (DirectionIsForward() && !ObstacleDetectedBehind(OBSTACLE_BEHIND_MANOEUVERING_RANGE_LIMIT_CM))
     {
-      SERIALPRINTLN("Plan Route; no obstacle ahead\n");
-      if (Turning())
-      {
-        if (TurningLeft())
-        {
-          if (
-              (GetRadarForwardMeasurements(LEFT2)+GetRadarForwardMeasurements(LEFT1))
-              >
-              (GetRadarForwardMeasurements(LEFT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
-             )
-          {
-            SERIALPRINTLN("Plan Route; decision: steer left->left, drive forward\n");
-            Steer(left);
-          }
-          else
-          {
-            SERIALPRINTLN("Plan Route; decision: steer left->none, drive forward\n");
-            Steer(none); 
-          }
-        } else
-        if (TurningRight())
-        {
-          if (
-              (GetRadarForwardMeasurements(RIGHT2)+GetRadarForwardMeasurements(RIGHT1))
-              >
-              (GetRadarForwardMeasurements(RIGHT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
-             )
-          {
-            SERIALPRINTLN("Plan Route; decision: steer right->right, drive forward\n");
-            Steer(right);
-          }
-          else
-          {
-            SERIALPRINTLN("Plan Route; decision: steer right->none, drive forward\n");
-            Steer(none);
-          }
-        }
-      }
-      else if (!Turning())
-      {
-        if (
-            (GetRadarForwardMeasurements(DEAD_AHEAD)+GetRadarForwardMeasurements(RIGHT1))
-            >
-            (GetRadarForwardMeasurements(LEFT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
-           )
-        {
-          SERIALPRINTLN("Plan Route; decision: steer none->right, drive forward\n");
-          Steer(right);
-        } else
-        if (
-            (GetRadarForwardMeasurements(LEFT1)+GetRadarForwardMeasurements(DEAD_AHEAD))
-            >
-            (GetRadarForwardMeasurements(DEAD_AHEAD)+GetRadarForwardMeasurements(RIGHT1))
-           )
-        {
-          SERIALPRINTLN("Plan Route; decision: steer none->left, drive forward\n");
-          Steer(left);
-        }
-      }
-    }
-    else if (!(ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT)))
-    {
-      SERIALPRINTLN("Plan Route; obstacle ahead, no obstacle behind");
+      SERIALPRINTLN("Plan Route; obstacle ahead, no obstacle Behind");
       SERIALPRINTLN("Plan Route; decision: steer none, drive reverse");
       Steer(none);
       Drive(reverse);
     }
     else
+    if (DirectionIsReverse() && !ObstacleDetectedAhead(OBSTACLE_AHEAD_MANOEUVERING_RANGE_LIMIT_CM))
     {
-      SERIALPRINTLN("Plan Route; obstacle ahead & behind");
+      SERIALPRINTLN("Plan Route; obstacle Behind, no obstacle ahead");
+      SERIALPRINTLN("Plan Route; decision: steer none, drive forward");
+      Steer(none);
+      Drive(reverse);
+    }
+    else
+    {
+      SERIALPRINTLN("Plan Route; obstacles ahead & Behind");
       SERIALPRINTLN("Plan Route; decision: no option to change course");
       Steer(none);
       Drive(forward);
+        // three point turn?
+    }
+  }
+
+  // Plan manoeuvre
+
+  if (DirectionIsForward())
+  {
+    SERIALPRINTLN("Plan Route; current direction is forward\n");
+    if (Turning())
+    {
+      if (TurningLeft())
+      {
+        if (
+          (GetDistancetoObstacleAhead(DEAD_AHEAD) > (GetDistancetoObstacleAhead(LEFT1)+TURN_CHANGE_HYSTERESIS_CM))
+          &&
+          (GetDistancetoObstacleAhead(DEAD_AHEAD) > (GetDistancetoObstacleAhead(LEFT2)+TURN_CHANGE_HYSTERESIS_CM))
+          )
+        {
+          SERIALPRINTLN("Plan Route; decision: steer left->none, drive forward\n");
+          Steer(none);
+          Drive(forward); 
+        }
+      } else
+      if (TurningRight())
+      {
+        if (
+          (GetDistancetoObstacleAhead(DEAD_AHEAD) > (GetDistancetoObstacleAhead(RIGHT1)+TURN_CHANGE_HYSTERESIS_CM))
+          &&
+          (GetDistancetoObstacleAhead(DEAD_AHEAD) > (GetDistancetoObstacleAhead(RIGHT2)+TURN_CHANGE_HYSTERESIS_CM))
+          )
+        {
+          SERIALPRINTLN("Plan Route; decision: steer right->none, drive forward\n");
+          Steer(none);
+          Drive(forward);
+        }
+      }
+    }
+    else // not turning
+    {
+      if (
+          (GetDistancetoObstacleAhead(RIGHT1) > (GetDistancetoObstacleAhead(DEAD_AHEAD)+TURN_CHANGE_HYSTERESIS_CM))
+        &&
+          (GetDistancetoObstacleAhead(RIGHT1) > (GetDistancetoObstacleAhead(LEFT1)+TURN_CHANGE_HYSTERESIS_CM))
+        )
+      {
+        SERIALPRINTLN("Plan Route; decision: steer none->right, drive forward\n");
+        Steer(right);
+        Drive(forward);
+      } else
+      if (
+          (GetDistancetoObstacleAhead(LEFT1) > (GetDistancetoObstacleAhead(DEAD_AHEAD)+TURN_CHANGE_HYSTERESIS_CM))
+        &&
+          (GetDistancetoObstacleAhead(LEFT1) > (GetDistancetoObstacleAhead(RIGHT1)+TURN_CHANGE_HYSTERESIS_CM))
+        )
+      {
+        SERIALPRINTLN("Plan Route; decision: steer none->left, drive forward\n");
+        Steer(left);
+        Drive(forward);
+      }     
     }
   }
   else if (DirectionIsReverse())
   {
     SERIALPRINTLN("Plan Route; current direction is reverse\n");
-    if (!ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT))
+    if (Turning())
     {
-      SERIALPRINTLN("Plan Route; no obstacle behind\n");
-      if (Turning())
+      if (TurningLeft()) // nb right in reverse
       {
-        if (TurningLeft()) // nb right in reverse
+        if (
+          (GetDistancetoObstacleBehind(DEAD_BEHIND) > (GetDistancetoObstacleBehind(RIGHT1)+TURN_CHANGE_HYSTERESIS_CM))
+          &&
+          (GetDistancetoObstacleBehind(DEAD_BEHIND) > (GetDistancetoObstacleBehind(RIGHT2)+TURN_CHANGE_HYSTERESIS_CM))
+          )
         {
-          if (
-              (GetRadarRearwardMeasurements(RIGHT2)+GetRadarRearwardMeasurements(RIGHT1))
-              >
-              (GetRadarRearwardMeasurements(RIGHT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
-             )
-          {
-            SERIALPRINTLN("Plan Route; decision: steer left->left, drive reverse\n");
-            Steer(left);
-          }
-          else
-          {
-            SERIALPRINTLN("Plan Route; decision: steer left->none, drive reverse\n");
-            Steer(none);
-          }
-        } else
-        if (TurningRight()) // nb left in reverse
-        {
-          if (
-              (GetRadarRearwardMeasurements(LEFT2)+GetRadarRearwardMeasurements(LEFT1))
-              >
-              (GetRadarRearwardMeasurements(LEFT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
-             )
-          {
-            SERIALPRINTLN("Plan Route; decision: steer right->right, drive reverse\n");
-            Steer(right);
-          }
-          else
-          {
-            SERIALPRINTLN("Plan Route; decision: steer right->none, drive reverse\n");
-            Steer(none);
-          }
+          SERIALPRINTLN("Plan Route; decision: steer left->none, drive reverse\n");
+          Steer(none);
+          Drive(reverse);
         }
-      }
-      else if (!Turning())
+      } else
+      if (TurningRight()) // nb left in reverse
       {
         if (
-            (GetRadarRearwardMeasurements(DEAD_AHEAD)+GetRadarRearwardMeasurements(RIGHT1))
-            >
-            (GetRadarRearwardMeasurements(LEFT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
-           )
+          (GetDistancetoObstacleBehind(DEAD_BEHIND) > (GetDistancetoObstacleBehind(LEFT1)+TURN_CHANGE_HYSTERESIS_CM))
+          &&
+          (GetDistancetoObstacleBehind(DEAD_BEHIND) > (GetDistancetoObstacleBehind(LEFT2)+TURN_CHANGE_HYSTERESIS_CM))
+          )
         {
-          SERIALPRINTLN("Plan Route; decision: steer none->left, drive reverse\n");
-          Steer(left);
-        } else
-        if (
-            (GetRadarRearwardMeasurements(LEFT1)+GetRadarRearwardMeasurements(DEAD_AHEAD))
-            >
-            (GetRadarRearwardMeasurements(DEAD_AHEAD)+GetRadarRearwardMeasurements(RIGHT1))
-           )
-        {
-          SERIALPRINTLN("Plan Route; decision: steer none->right, drive reverse\n");
-          Steer(right);
+          SERIALPRINTLN("Plan Route; decision: steer right->none, drive reverse\n");
+          Steer(none);
+          Drive(reverse);
         }
       }
     }
-    else if (!ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
+    else // not turning
     {
-      SERIALPRINTLN("Plan Route; obstacle behind, no obstacle ahead");
-      SERIALPRINTLN("Plan Route; decision: steer none, drive forward");
-      Steer(none);
-      Drive(forward);
-    }
-    else
-    {
-      SERIALPRINTLN("Plan Route; obstacle ahead & behind");
-      SERIALPRINTLN("Plan Route; decision: no option to change course");
-      Steer(none);
-      Drive(reverse);
+      if (
+          (GetDistancetoObstacleBehind(RIGHT1) > (GetDistancetoObstacleBehind(DEAD_BEHIND)+TURN_CHANGE_HYSTERESIS_CM))
+        &&
+          (GetDistancetoObstacleBehind(RIGHT1) > (GetDistancetoObstacleBehind(LEFT1)+TURN_CHANGE_HYSTERESIS_CM))
+        )
+      {
+        SERIALPRINTLN("Plan Route; decision: steer none->left, drive reverse\n");
+        Steer(left);
+        Drive(reverse);
+      } else
+      if (
+          (GetDistancetoObstacleBehind(LEFT1) > (GetDistancetoObstacleBehind(DEAD_BEHIND)+TURN_CHANGE_HYSTERESIS_CM))
+        &&
+          (GetDistancetoObstacleBehind(LEFT1) > (GetDistancetoObstacleBehind(RIGHT1)+TURN_CHANGE_HYSTERESIS_CM))
+        )
+      {
+        SERIALPRINTLN("Plan Route; decision: steer none->right, drive reverse\n");
+        Steer(right);
+        Drive(reverse);
+      }
     }
   }
-
 }
+
 void Car::PlanSpeed()
 {
   SERIALPRINTLN("Plan Speed");
 
   if (DirectionIsForward())
   {
-    if (ObstacleDetectedAhead(STEERING_FORWARD_RANGE_LIMIT))
+    if (ObstacleDetectedAhead(OBSTACLE_AHEAD_MANOEUVERING_RANGE_LIMIT_CM))
     {
       // We're inside the car's turning circle, and facing an obstacle. time to stop.
       SERIALPRINTLN("Forward Stop");
@@ -421,7 +380,7 @@ void Car::PlanSpeed()
   }
   else if (DirectionIsReverse())
   {
-    if (ObstacleDetectedBehind(STEERING_REAR_RANGE_LIMIT))
+    if (ObstacleDetectedBehind(OBSTACLE_BEHIND_MANOEUVERING_RANGE_LIMIT_CM))
     {
       // We're inside the car's turning circle, and facing an obstacle. time to stop.
       SERIALPRINTLN("Reverse Stop");
@@ -446,13 +405,10 @@ bool Car::DriveMotorStopped()
 {
   return (current_drive_motor_speed == 0);
 }
-bool Car::SteeringMotorStopped()
-{
-  return (current_steering_motor_speed == 0);
-}
+
 bool Car::Moving()
 {
-  return ( MovingForward() || MovingBackward() );
+  return ( MovingForward() || MovingReverse() );
 }
 bool Car::Braking()
 {
@@ -466,7 +422,7 @@ bool Car::MovingForward()
 {
   return ( (current_drive_motor_direction == forward ) && (current_drive_motor_speed > 0) );
 }
-bool Car::MovingBackward()
+bool Car::MovingReverse()
 {
   return ( (current_drive_motor_direction == reverse ) && (current_drive_motor_speed > 0) );
 }
@@ -510,7 +466,7 @@ bool Car::ObstacleDetectedAhead(float range_limit)
 
   for (int16_t i = start_index; i <= end_index; i++)
   {
-    range = GetRadarForwardMeasurements(i * RADAR_SCAN_STEP_DEGREES);
+    range = GetDistancetoObstacleAhead(i * RADAR_SCAN_STEP_DEGREES);
     if (range < range_limit)
     {
       SERIALPRINT("Obstacle ahead. Range ");
@@ -545,10 +501,10 @@ bool Car::ObstacleDetectedBehind(float range_limit)
 
   for (int16_t i = start_index; i <= end_index; i++)
   {
-    range = GetRadarRearwardMeasurements(i * RADAR_SCAN_STEP_DEGREES);
+    range = GetDistancetoObstacleBehind(i * RADAR_SCAN_STEP_DEGREES);
     if (range < range_limit)
     {
-      SERIALPRINT("Obstacle behind. Range ");
+      SERIALPRINT("Obstacle Behind. Range ");
       SERIALPRINT(range);
       SERIALPRINT(" cm (min ");
       SERIALPRINT(range_limit);
@@ -563,20 +519,18 @@ bool Car::ObstacleDetectedBehind(float range_limit)
 }
 bool Car::CollisionAvoidance()
 {
-  if (DirectionIsForward() && ObstacleDetectedAhead(MINIMUM_FORWARD_RANGE_LIMIT))
+  if (DirectionIsForward() && ObstacleDetectedAhead(OBSTACLE_AHEAD_EMERGENCY_STOP_RANGE_LIMIT_CM))
   {
-    SERIALPRINTLN("Vehicle direction is forward, but obstacle too close to front of vehicle!");
+    SERIALPRINTLN("Vehicle direction is forward, but obstacle too close ahead vehicle!");
+    return true;
   }
-  else if (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE_LIMIT))
+  else if (DirectionIsReverse() && ObstacleDetectedBehind(OBSTACLE_BEHIND_EMERGENCY_STOP_RANGE_LIMIT_CM))
   {
-    SERIALPRINTLN("Vehicle direction is reverse, but obstacle too close to rear of vehicle!");
+    SERIALPRINTLN("Vehicle direction is reverse, but obstacle too close behind vehicle!");
+    return true;
   }
 
-  return (
-           (DirectionIsForward() && ObstacleDetectedAhead(MINIMUM_FORWARD_RANGE_LIMIT))
-           ||
-           (DirectionIsReverse() && ObstacleDetectedBehind(MINIMUM_REAR_RANGE_LIMIT))
-         );
+  return false;
 }
 void Car::SetDriveMotorSpeed(uint16_t s)
 {
@@ -595,50 +549,28 @@ void Car::SetDriveMotorSpeed(uint16_t s)
     SERIALPRINTLN(current_drive_motor_speed);    
   }
 }
-void Car::SetSteeringMotorSpeed(uint16_t s)
-{
-  if (s != current_steering_motor_speed)
-  {
-    SERIALPRINT("Changing steering motor speed from ");
-    SERIALPRINT(current_steering_motor_speed);
-    SERIALPRINT(" to ");
-    SERIALPRINTLN( s);
 
-    target_steering_motor_speed = s;
-  }
-  else
-  {
-    SERIALPRINT("Steering motor speed at ");
-    SERIALPRINTLN(current_steering_motor_speed);    
-    SERIALPRINT("Target steering motor speed at ");
-    SERIALPRINTLN(target_steering_motor_speed);
-  }
-}
 void Car::HardStop()
 {
   status_changed = true;
   // Power down drive motor
   pwm_set_gpio_level(DRIVE_MOTOR_SPEED_PIN, 0);
-  // Power down steering motor
-  pwm_set_gpio_level(STEERING_MOTOR_SPEED_PIN, 0);
-
-  // Power down steering relay
+  // Power down drive motor relay
   gpio_put(DRIVE_MOTOR_DIRECTION_PIN, false );
-  // Power down steering motor
-  gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
+
+  // Cancel steering
+  steering_motor.SetDegrees(STEERING_MOTOR_CENTRE_ANGLE);
 
   current_drive_motor_direction = forward;
   current_steering_motor_direction = none;
   current_drive_motor_speed    = 0;
-  current_steering_motor_speed = 0;
   target_drive_motor_speed     = 0;
-  target_steering_motor_speed  = 0;
 
   // Initialise/reset radar measurements (something bad has happened, so clear it out)
   for(int16_t r=0; r<RADAR_MEASUREMENTS; r++)
   {
-    radar_forward_measurements[ r]=0;
-    radar_rearward_measurements[r]=0;
+    radar_front_measurements[ r]=0;
+    radar_rear_measurements[r]=0;
   }
 
   // force the car to gather fifo messages before moving off
@@ -734,20 +666,10 @@ void Car::Steer( steering_motor_direction direction )
     case left:
       if (!TurningLeft())
       {
-        if (!SteeringMotorStopped())
-        {
-          SERIALPRINTLN("Stopping steering motor for direction change to left..");
-          // Slow to a stop
-          SetSteeringMotorSpeed( 0 ); 
-        }
-        else
-        {
-          SERIALPRINTLN("Changing steering motor direction to left");
-          status_changed = true;
-          gpio_put(STEERING_MOTOR_DIRECTION_PIN, true );
-          SetSteeringMotorSpeed(STEERING_MOTOR_HIGH_SPEED);
-          current_steering_motor_direction = left; 
-        }
+        SERIALPRINTLN("Changing steering motor direction to left");
+        status_changed = true;
+        steering_motor.SetDegrees(STEERING_MOTOR_MAX_LEFT_ANGLE);
+        current_steering_motor_direction = left; 
       } else
       {
         SERIALPRINTLN("Maintaining left steering direction");
@@ -756,20 +678,10 @@ void Car::Steer( steering_motor_direction direction )
     case right:
       if (!TurningRight())
       {
-        if (!SteeringMotorStopped())
-        {
-          SERIALPRINTLN("Stopping steering motor for direction change to right..");
-          // Slow to a stop
-          SetSteeringMotorSpeed( 0 ); 
-        }
-        else
-        {
-          SERIALPRINTLN("Changing steering motor direction to right");
-          status_changed = true;
-          gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
-          SetSteeringMotorSpeed(STEERING_MOTOR_HIGH_SPEED);
-          current_steering_motor_direction = right; 
-        }
+        SERIALPRINTLN("Changing steering motor direction to right");
+        status_changed = true;
+        steering_motor.SetDegrees(STEERING_MOTOR_MAX_RIGHT_ANGLE);
+        current_steering_motor_direction = right; 
       } else
       {
         SERIALPRINTLN("Maintaining right steering direction");
@@ -778,46 +690,35 @@ void Car::Steer( steering_motor_direction direction )
     case none:
       if (Turning())
       {
-        if (!SteeringMotorStopped())
-        {
-          SERIALPRINTLN("Stopping steering motor for direction change to none..");
-          // Slow to a stop
-          SetSteeringMotorSpeed( 0 );
-        }
-        else
-        {
-          SERIALPRINTLN("Steering none");
-          status_changed = true;
-          gpio_put(STEERING_MOTOR_DIRECTION_PIN, false );
-          SetSteeringMotorSpeed(0);
-          current_steering_motor_direction = none;
-        }
+        SERIALPRINTLN("Steering none");
+        status_changed = true;
+        steering_motor.SetDegrees(STEERING_MOTOR_CENTRE_ANGLE);
+        current_steering_motor_direction = none;
       }
       else
       {
-        SERIALPRINTLN("Maintaining forward (no steering) direction");
+        SERIALPRINTLN("Maintaining no steering direction");
       }
-
       break;    
   }
 }
-uint32_t Car::GetRadarForwardMeasurements(int8_t angle)
+uint32_t Car::GetDistancetoObstacleAhead(int8_t angle)
 {
   angle = (angle<-90)?-90:angle;
   angle = (angle> 90)? 90:angle;
 
   uint8_t index = ConvertCarAngleToRadarAngle(angle) / RADAR_MEASUREMENTS_GRANULARITY;
-  uint32_t distance = radar_forward_measurements[index];
+  uint32_t distance = radar_front_measurements[index];
 
   return distance;
 }
-uint32_t Car::GetRadarRearwardMeasurements(int8_t angle)
+uint32_t Car::GetDistancetoObstacleBehind(int8_t angle)
 {
   angle = (angle<-90)?-90:angle;
   angle = (angle> 90)? 90:angle;
 
   uint8_t index = ConvertCarAngleToRadarAngle(angle) / RADAR_MEASUREMENTS_GRANULARITY;
-  uint32_t distance = radar_rearward_measurements[index];
+  uint32_t distance = radar_rear_measurements[index];
 
   return distance;
 }
@@ -853,11 +754,11 @@ void Car::DecodeFifo(uint32_t fifo_message)
       {
         case 'F': // forward
           SERIALPRINT("forward ");
-          radar_forward_measurements[index] = range_1cm; 
+          radar_front_measurements[index] = range_1cm; 
           break;
         case 'R': // rearward
           SERIALPRINT("rearward ");
-          radar_rearward_measurements[index] = range_1cm;
+          radar_rear_measurements[index] = range_1cm;
           break;
         default:
           break;
@@ -878,7 +779,7 @@ void Car::DecodeFifo(uint32_t fifo_message)
   }
 }
 
-int16_t Car::ConvertServoAngleToCarAngle(uint8_t angle)
+int16_t Car::ConvertRadarAngleToCarAngle(uint8_t angle)
 {
   return (-1*(angle-90));
 }
@@ -929,11 +830,11 @@ void Car::DumpRadarMetrics()
   {
     SERIALPRINT(r*RADAR_MEASUREMENTS_GRANULARITY);
     SERIALPRINT(":\t");
-    SERIALPRINT(ConvertServoAngleToCarAngle(r*RADAR_MEASUREMENTS_GRANULARITY));
+    SERIALPRINT(ConvertRadarAngleToCarAngle(r*RADAR_MEASUREMENTS_GRANULARITY));
     SERIALPRINT(":\t");
-    SERIALPRINT(radar_forward_measurements[ r]);
+    SERIALPRINT(radar_front_measurements[ r]);
     SERIALPRINT(",\t");
-    SERIALPRINT(radar_rearward_measurements[r]);
+    SERIALPRINT(radar_rear_measurements[r]);
     SERIALPRINTLN("");
   }
   SERIALPRINTLN("........................................................................................");
@@ -961,13 +862,13 @@ void Car::PlotRadarMetrics(int diameter)
       {
         tangent = (atan2(opposite,adjacent)*57.295779513);
         i = round (tangent / RADAR_MEASUREMENTS_GRANULARITY);
-        m = radar_forward_measurements[i];
+        m = radar_front_measurements[i];
       }
       else
       {
         tangent = 180 - (atan2(opposite,adjacent)*57.295779513);
         i = round (tangent / RADAR_MEASUREMENTS_GRANULARITY);
-        m = radar_rearward_measurements[i];
+        m = radar_rear_measurements[i];
       }
 
       if (y==0)
@@ -995,9 +896,9 @@ void Car::PlotRadarMetrics(int diameter)
       }
       else
       {
-        if(hypotenuse<STEERING_FORWARD_RANGE_LIMIT)
+        if(hypotenuse<OBSTACLE_AHEAD_MANOEUVERING_RANGE_LIMIT_CM)
         {
-          SERIALPRINT((hypotenuse<MINIMUM_FORWARD_RANGE_LIMIT)?".":"¤");
+          SERIALPRINT((hypotenuse<OBSTACLE_AHEAD_EMERGENCY_STOP_RANGE_LIMIT_CM)?".":"¤");
         }
         else
         {

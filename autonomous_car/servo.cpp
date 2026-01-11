@@ -1,12 +1,12 @@
 #include "autonomous_car.h"
 #include "servo.h"
 
-Servo::Servo()
+Servo::Servo(uint8_t servo_pin)
 {
-  float      pwm_target_frequency_hz;
+  this->servo_pin = servo_pin;
 
-  gpio_set_function(RADAR_TURRET_PIN, GPIO_FUNC_PWM);
-  servo_pwm_slice = pwm_gpio_to_slice_num(RADAR_TURRET_PIN);
+  gpio_set_function(servo_pin, GPIO_FUNC_PWM);
+  servo_pwm_slice = pwm_gpio_to_slice_num(servo_pin);
 
   // 50 Hz is the standard servo refresh rate
   // The divider of 100 keeps the PWM clock stable
@@ -15,6 +15,9 @@ Servo::Servo()
   //   𝑓 = clock_sys /  clkdiv ⋅ ( wrap + 1 )
   pwm_set_wrap(servo_pwm_slice, SERVO_PWM_CONFIG_TOP_LEVEL);
   pwm_set_clkdiv(servo_pwm_slice, 100);
+  // don't need to invert the PWM because we're using non-inverting opto-couplers
+  //pwm_set_output_polarity(servo_pwm_slice, true, true);
+
   // Enable PWM
   pwm_set_enabled(servo_pwm_slice, true);
 
@@ -28,8 +31,8 @@ void Servo::SetDegrees(float target_servo_degrees)
   float pwm_pulse_length_us;
   uint16_t gpio_level;
 
-  target_servo_degrees = (target_servo_degrees>180)?180:target_servo_degrees;
-  target_servo_degrees = (target_servo_degrees<  0)?  0:target_servo_degrees;
+  target_servo_degrees = (target_servo_degrees>SERVO_ROTATION_RANGE_DEGREES)? SERVO_ROTATION_RANGE_DEGREES:target_servo_degrees;
+  target_servo_degrees = (target_servo_degrees<                           0)? 0:target_servo_degrees;
   servo_degrees = target_servo_degrees;
 
    pwm_pulse_length_us = SERVO_PWM_MIN_PULSE_LENGTH_US +
@@ -57,7 +60,7 @@ void Servo::SetDegrees(float target_servo_degrees)
     c = pwm_get_counter(servo_pwm_slice);
   }
 
-  pwm_set_gpio_level(RADAR_TURRET_PIN, gpio_level);
+  pwm_set_gpio_level(servo_pin, gpio_level);
 }
 
 uint8_t Servo::GetDegrees()
