@@ -18,9 +18,9 @@ The car uses a Raspberry Pi Pico for its brains... running code on both cores, u
 The code provides examples of;
  - A complex Pico project, compiled under the Arduino IDE
  - Multi-core programming using the [Pico C/C++SDK](https://datasheets.raspberrypi.com/pico/raspberry-pi-pico-c-sdk.pdf)
- - SG90 miniature servo position control using PWM
+ - SG90 micro servo control using PWM
  - DC motor direction control using GPIO to switch a DPDT mechanical relay using a MOSFET
- - PWM DC motor speed control using GPIO to switch a MOSFET
+ - DC motor speed control using GPIO & PWM to switch a MOSFET
  - Interrupt driven measurement from ultrasound sensors
 
 The 'radar' turret is [based on this own design 3D printed kit](https://www.tinkercad.com/embed/0e6vV6PrGs4?editbtn=1) and a pair of back-to-back ultrasound sensors. The ultrasound turret sits on top of a digital servo.
