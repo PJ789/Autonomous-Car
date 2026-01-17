@@ -224,7 +224,7 @@ void Car::PlanRoute()
       SERIALPRINTLN("Plan Route; obstacle Behind, no obstacle ahead");
       SERIALPRINTLN("Plan Route; decision: steer none, drive forward");
       Steer(none);
-      Drive(reverse);
+      Drive(forward);
     }
     else
     {
@@ -910,3 +910,4 @@ void Car::PlotRadarMetrics(int diameter)
   }
  
 }
+
