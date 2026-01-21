@@ -6,7 +6,9 @@ An autonomous model vehicle based on a Raspberry Pi Pico, using servo motors, DC
 ## Overview
 
 This project repurposes an old remote control model car to become an autonomous vehicle.
-<video src="https://github.com/PJ789/Autonomous-Car/raw/refs/heads/main/car_test.mp4" width="320" height="240" controls></video>
+
+[Watch a video of a test run.](https://github.com/PJ789/Autonomous-Car/raw/refs/heads/main/car_test.mp4)
+
 The car is capable of 'Partial Automation'; controlling steering & acceleration/braking simultaneously,  maintaining distance from obstacles in its path, manoeuvering, but needs human supervision. 
 
 The car uses a Raspberry Pi Pico for its brains... running code on both cores, using the _official_ [Arduino Core based on Mbed RTOS which includes support for Pico.](https://github.com/arduino/ArduinoCore-mbed/tree/master/variants/RASPBERRY_PI_PICO).
