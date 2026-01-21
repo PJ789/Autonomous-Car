@@ -115,7 +115,9 @@ I've worked on this project for a few years, on and off. Now its working, I can 
 
 - Switch chassis, to a hobby grade HSP/Himoto 1/16 buggy platform with a 390 main motor, ESC controlled main motor, and 3 wire servo steering
 - Implement LIDAR, for higher speeds, using adaptive 270° overlapping field of view scan zones (180° forward + 90° left side, 180° rearward + 90° right side)
+- Implement [wheel hub magnets based on this design](https://www.tinkercad.com/things/0p47F2eLgXn-rc-car-wheel-insert-for-neodymium-magnets) and integrate with [A3214EUA-T Hall Effect sensor](https://www.allegromicro.com/-/media/files/datasheets/a3213-4-datasheet.pdf) for speed measurement
 - Add 'oh hell no' sensors for permanent last resort accident prevention
+- Integrate [HLK-LD2415H millimeter wave radar module](https://www.hlktech.net/index.php?id=1220) or similar for long range vehicle & obstacle tracking.
 - ~~Switch to servo controlled steering, for simplicity & finesse~~ Done! 
 - Add accelerometers for orientation, impact detection, acceleration/deceleration measurement
 - Pair the Pico module with an ESP32 S3 CAM module as a co-processor, for wifi streaming of monitoring, diagnostics info
