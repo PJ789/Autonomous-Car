@@ -124,9 +124,10 @@ I've worked on this project for a few years, on and off. Now its working, I can 
 - Add accelerometers for orientation, impact detection, acceleration/deceleration measurement
 - Pair the Pico module with an ESP32 S3 CAM module as a co-processor, for wifi streaming of monitoring, diagnostics info
 - Video streaming from the car (see next item)
+- Investigate [Nvidia ROS ](https://developer.nvidia.com/isaac/ros#section-starter-kits)
 
  For my finale,
-- Attempt Nvidia Alpamayo AI integration https://developer.nvidia.com/drive/alpamayo for a truly AI autonomous model vehicle
+- Attempt [Nvidia Alpamayo AI integration](https://developer.nvidia.com/drive/alpamayo) for a truly AI autonomous model vehicle
 
 ## Some Caveats
 
